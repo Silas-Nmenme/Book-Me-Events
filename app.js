@@ -1,18 +1,18 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
-const { errorHandler } = require('./middlewares/errorMiddleware');
+const { errorHandler } = require('./src/middlewares/errorMiddleware');
 
-const authRoutes = require('./routes/authRoutes.js');
-const userRoutes = require('./routes/userRoutes.js');
-const vendorRoutes = require('./routes/vendorRoutes.js');
-const serviceRoutes = require('./routes/serviceRoutes.js');
-const requestRoutes = require('./routes/requewstRoutes.js');
-const bookingRoutes = require('./routes/bookingRoutes.js');
-const paymentRoutes = require('./routes/paymentRoutes.js');
-const reviewRoutes = require('./routes/reviewRoutes.js');
-const messageRoutes = require('./routes/messageRoutes.js');
-const adminRoutes = require('./routes/adminRoutes.js');
+const authRoutes = require('./src/routes/authRoutes.js');
+const userRoutes = require('./src/routes/userRoutes.js');
+const vendorRoutes = require('./src/routes/vendorRoutes.js');
+const serviceRoutes = require('./src/routes/serviceRoutes.js');
+const requestRoutes = require('./src/routes/requestRoutes.js');
+const bookingRoutes = require('./src/routes/bookingRoutes.js');
+const paymentRoutes = require('./src/routes/paymentRoutes.js');
+const reviewRoutes = require('./src/routes/reviewRoutes.js');
+const messageRoutes = require('./src/routes/messageRoutes.js');
+const adminRoutes = require('./src/routes/adminRoutes.js');
 
 const app = express();
 

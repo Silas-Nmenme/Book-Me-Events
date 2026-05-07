@@ -1,63 +1,98 @@
 const nodemailer = require('nodemailer');
-const emailTemplates = require('./emailTemplates');
 
 /**
  * Email Client
- * - Uses a single shared nodemailer transporter
- * - Validates env on init
- * - If env missing, disables email sending (best-effort) and never throws
+ * - Lazily initializes a shared nodemailer transporter
+ * - Disables email sending when SMTP env vars are missing
+ * - Never throws due to SMTP misconfiguration (best-effort)
  */
+
+const REQUIRED_SMTP_VARS = ['EMAIL_HOST', 'EMAIL_PORT', 'MAIL_USER', 'EMAIL_PASS'];
+
 let transporter = null;
-let initAttempted = false;
+let transporterInitAttemptedAt = 0;
+let lastInitResult = 'unset';
 
-const initTransporter = () => {
-  if (initAttempted) return transporter;
-  initAttempted = true;
+const getMissingEnv = () => {
+  return REQUIRED_SMTP_VARS.filter((key) => {
+    const v = process.env[key];
+    return v === undefined || v === null || v === '';
+  });
+};
 
-  const required = ['EMAIL_HOST', 'EMAIL_PORT', 'MAIL_USER', 'EMAIL_PASS'];
-  const missing = required.filter((key) => !process.env[key]);
+const shouldRetryInit = () => {
+  // If env is missing, keep logging sparingly but allow re-check.
+  // Retry every 10 seconds in case env is injected later.
+  const now = Date.now();
+  return now - transporterInitAttemptedAt > 10_000;
+};
 
+const initTransporterIfNeeded = () => {
+  if (transporter) return transporter;
+  if (!shouldRetryInit()) return null;
+
+  transporterInitAttemptedAt = Date.now();
+
+  const missing = getMissingEnv();
   if (missing.length) {
-    console.warn('Email service disabled - missing ENV:', missing);
+    // Avoid log spam; log only when previous state was OK or unset.
+    if (lastInitResult !== 'missing_env') {
+      console.warn('Email service disabled - missing ENV:', missing);
+      lastInitResult = 'missing_env';
+    }
     return null;
   }
 
-  transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: parseInt(process.env.EMAIL_PORT, 10),
-    secure: String(process.env.EMAIL_PORT) === '465',
-    auth: {
-      user: process.env.MAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100,
-  });
+  try {
+    transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port: Number.parseInt(process.env.EMAIL_PORT, 10),
+      secure: String(process.env.EMAIL_PORT) === '465',
+      auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
+    });
 
-  transporter.verify((err) => {
-    if (err) console.error('Email transporter failed:', err.message);
-    else console.log('Email service ready');
-  });
+    // Best-effort verify; do not fail the process.
+    transporter.verify((err) => {
+      if (err) {
+        console.error('Email transporter failed:', err.message);
+        lastInitResult = 'verify_failed';
+      } else {
+        console.log('Email service ready');
+        lastInitResult = 'ok';
+      }
+    });
 
-  return transporter;
-};
-
-const getTransporter = () => {
-  if (!transporter) initTransporter();
-  return transporter;
+    return transporter;
+  } catch (err) {
+    console.error('Email transporter init failed:', err.message);
+    transporter = null;
+    lastInitResult = 'init_failed';
+    return null;
+  }
 };
 
 /**
- * Compatibility wrapper for existing code.
- * authController expects sendEmail({ to, subject, text, html }).
+ * Compatibility wrapper used by controllers.
+ * Expected: sendEmail({ to, subject, text, html })
  */
-const sendEmail = async ({ to, subject, text, html }) => {
-  const t = getTransporter();
-  if (!t) return { success: false, message: 'Email service unavailable' };
+const sendEmail = async ({ to, subject, text, html } = {}) => {
+  const t = initTransporterIfNeeded();
+  if (!t) {
+    return { success: false, message: 'Email service unavailable' };
+  }
 
-  if (!to) throw new Error('Missing email recipient (to)');
-  if (!subject) throw new Error('Missing email subject');
+  if (!to) {
+    throw new Error('Missing email recipient (to)');
+  }
+  if (!subject) {
+    throw new Error('Missing email subject');
+  }
 
   const from = process.env.SMTP_FROM || process.env.MAIL_USER || process.env.EMAIL_FROM;
 
@@ -69,6 +104,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
       text,
       html,
     });
+
     return { success: true };
   } catch (error) {
     console.error(`Email send failed: ${error.message}`);
@@ -76,101 +112,7 @@ const sendEmail = async ({ to, subject, text, html }) => {
   }
 };
 
-/**
- * Production-style helpers (optional)
- * Kept here in case other controllers use these exported names later.
- */
-const sendOTPEmail = async (email, name, otp) => {
-  const t = getTransporter();
-  if (!t) return { success: false, message: 'Email service unavailable' };
+module.exports = { sendEmail };
 
-  const html = emailTemplates.otpVerification
-    ? emailTemplates.otpVerification(name, otp)
-    : htmlTemplate(otp);
 
-  return sendEmail({
-    to: email,
-    subject: 'Your Verification Code',
-    html,
-  });
-};
-
-const sendWelcomeEmail = async (email, name, htmlTemplate) => {
-  if (!htmlTemplate) {
-    const { html } = emailTemplates.welcomeEmail
-      ? emailTemplates.welcomeEmail({ firstName: name })
-      : { html: '' };
-    return sendEmail({
-      to: email,
-      subject: `Welcome to Book Me Events, ${name}!`,
-      html,
-    });
-  }
-
-  return sendEmail({
-    to: email,
-    subject: `Welcome to Book Me Events, ${name}!`,
-    html: htmlTemplate,
-  });
-};
-
-const htmlTemplate = (otp) => `
-  <div style="font-family: Arial, sans-serif;">
-    <h2>Your verification code</h2>
-    <p>Use the following OTP:</p>
-    <div style="font-size: 24px; font-weight: 700;">${otp}</div>
-  </div>
-`;
-
-const sendLoginSuccessEmail = async (email, name) => {
-  const t = getTransporter();
-  if (!t) return { success: false, message: 'Email service unavailable' };
-
-  const timestamp = new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' });
-  const html = emailTemplates.loginSuccess
-    ? emailTemplates.loginSuccess(name, timestamp)
-    : emailTemplates.loginSuccessEmail
-      ? emailTemplates.loginSuccessEmail({ firstName: name, email })
-      : htmlTemplate(`Logged in at ${timestamp}`);
-
-  // html could be {subject,text,html} depending on templates; normalize
-  const normalizedHtml = typeof html === 'string' ? html : html?.html;
-
-  return sendEmail({
-    to: email,
-    subject: 'Login Successful - Welcome Back',
-    html: normalizedHtml || html,
-  });
-};
-
-const sendPasswordResetEmail = async (email, name, resetUrl) => {
-  const t = getTransporter();
-  if (!t) return { success: false, message: 'Email service unavailable' };
-
-  const tpl = emailTemplates.passwordResetRequestedEmail
-    ? emailTemplates.passwordResetRequestedEmail({ firstName: name, resetLink: resetUrl })
-    : null;
-
-  if (!tpl) return { success: false, message: 'Missing password reset template' };
-
-  return sendEmail({
-    to: email,
-    subject: tpl.subject,
-    text: tpl.text,
-    html: tpl.html,
-  });
-};
-
-// Initialize transporter on module load (best-effort)
-initTransporter();
-
-module.exports = {
-  sendEmail,
-
-  // optional exports
-  sendOTPEmail,
-  sendWelcomeEmail,
-  sendLoginSuccessEmail,
-  sendPasswordResetEmail,
-};
 
