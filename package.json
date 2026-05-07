@@ -5,7 +5,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "echo \"No build step for API (serverless)\"",
+    "build": "node -e \"process.exit(0)\"", 
     "test": "echo \"Error: no test specified\" && exit 0",
     "lint": "echo \"No lint configured\" && exit 0"
   },
