@@ -106,9 +106,36 @@ function passwordResetSuccessEmail({ firstName }) {
   return { subject, text, html };
 }
 
+function loginSuccessEmail({ firstName, email }) {
+  const safeFirstName = escapeHtml(firstName || 'there');
+  const safeEmail = escapeHtml(email || '');
+
+  const subject = `Login successful - ${APP_NAME}`;
+  const text = `Hi ${safeFirstName},\n\nYou successfully signed in to ${APP_NAME}.`;
+
+  const bodyLines = [
+    `<p style="margin:0 0 12px;">Hi <b>${safeFirstName}</b>,</p>`,
+    `<p style="margin:0;">You successfully signed in to <b>${escapeHtml(APP_NAME)}</b>.</p>`,
+  ];
+
+  if (safeEmail) {
+    bodyLines.push(
+      `<p style="margin:12px 0 0;color:#6b7280;">Signed in as: <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;">${safeEmail}</span></p>`
+    );
+  }
+
+  const html = buildBaseHtml({
+    title: 'Welcome back!',
+    bodyHtml: bodyLines.join(''),
+  });
+
+  return { subject, text, html };
+}
+
 module.exports = {
   welcomeEmail,
   passwordResetRequestedEmail,
   passwordResetSuccessEmail,
+  loginSuccessEmail,
 };
 

@@ -6,7 +6,9 @@ const {
   welcomeEmail,
   passwordResetRequestedEmail,
   passwordResetSuccessEmail,
+  loginSuccessEmail,
 } = require('../utils/emailTemplates');
+
 
 
 // @desc    Register user
@@ -103,12 +105,31 @@ exports.login = asyncHandler(async (req, res) => {
   // Generate token
   const token = generateToken(user._id);
 
+  // Send login email (best-effort: don't fail login if email fails)
+  try {
+    const { subject, text, html } = loginSuccessEmail({
+      firstName: user.firstName,
+      email: user.email,
+    });
+
+    await sendEmail({
+      to: user.email,
+      subject,
+      text,
+      html,
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Login email failed:', err.message);
+  }
+
   res.status(200).json({
     success: true,
     data: user,
     token,
   });
 });
+
 
 // @desc    Logout user
 // @route   POST /api/v1/auth/logout
