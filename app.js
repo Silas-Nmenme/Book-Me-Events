@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -13,8 +15,12 @@ const paymentRoutes = require('./src/routes/paymentRoutes.js');
 const reviewRoutes = require('./src/routes/reviewRoutes.js');
 const messageRoutes = require('./src/routes/messageRoutes.js');
 const adminRoutes = require('./src/routes/adminRoutes.js');
+const connectDB = require('./src/config/db.js');
 
 const app = express();
+
+
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
@@ -44,4 +50,20 @@ app.use((req, res, next) => {
 
 app.use(errorHandler);
 
-module.exports = app;
+// ===== START SERVER =====
+const startServer = async () => {
+  try {
+    await connectDB();
+    server = app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV}`);
+      
+      // Email service auto-initializes on module load
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  }
+};
+
+startServer();

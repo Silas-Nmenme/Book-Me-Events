@@ -1,24 +1,35 @@
 const mongoose = require('mongoose');
+const dotenv = require('dotenv');
 
-const connectDB = async () => {
+dotenv.config();
+
+/**
+ * MongoDB Connection with Retry Logic
+ * Vercel/serverless compatible (graceful fallback)
+ */
+const connectDB = async (retries = 3) => {
   try {
-    const uri = process.env.MONGO_URI;
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: Number(process.env.NODE_ENV === 'production' ? 5 : 10),
+      socketTimeoutMS: 45000,
+    });
 
-    if (!uri || typeof uri !== 'string') {
-      throw new Error(
-        'Missing or invalid MONGO_URI. Set MONGO_URI in your environment (e.g., .env) as a string.'
-      );
-    }
-
-    await mongoose.connect(uri);
-    console.log('MongoDB connected');
+    console.log(`MongoDB connected`);
+    return conn;
   } catch (error) {
-    console.error('MongoDB connection failed:', error.message);
-    // In serverless environments (like Vercel), do NOT terminate the process.
-    // Return/throw so the request can fail gracefully and Vercel can report it.
-    throw error;
-
+    console.error('MongoDB Error:', error.message);
+    
+    if (retries > 0) {
+      console.log(`🔄 Retrying DB connection... (${retries} left)`);
+      await new Promise(r => setTimeout(r, 2000));
+      return connectDB(retries - 1);
+    }
+    
+    console.error('DB connection failed permanently');
+    return null; // Continue without DB for serverless
   }
 };
 
 module.exports = connectDB;
+
