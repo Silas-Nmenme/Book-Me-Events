@@ -22,7 +22,5 @@ router.post('/', protect, authorize('USER'), createPayment);
 // Refund payment
 router.post('/:id/refund', protect, refundPayment);
 
-// Payment statistics (Admin only)
-router.get('/stats/overview', protect, authorize('ADMIN'), getPaymentStats);
 
 module.exports = router;
