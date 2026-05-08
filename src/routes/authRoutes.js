@@ -20,6 +20,6 @@ router.post('/reset-password/:token', resetPassword);
 // Protected routes
 router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
-router.post('/verify-email', protect, verifyEmail);
+router.post('/verify-email', verifyEmail);
 
 module.exports = router;

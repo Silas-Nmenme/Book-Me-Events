@@ -11,9 +11,10 @@ const {
 } = require('../controllers/paymentController');
 
 // Protected routes
-router.get('/', protect, getPayments);
-router.get('/:id', protect, getPayment);
 router.get('/ref/:ref', protect, getPaymentByRef);
+router.get('/stats/overview', protect, authorize('ADMIN'), getPaymentStats);
+
+router.get('/:id', protect, getPayment);
 
 // Create payment (User only)
 router.post('/', protect, authorize('USER'), createPayment);
