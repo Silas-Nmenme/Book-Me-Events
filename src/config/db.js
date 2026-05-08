@@ -4,7 +4,7 @@ const connectDB = async () => {
   try {
     if (!process.env.MONGO_URI) {
       console.error('MONGO_URI is missing');
-      return null;
+      throw new Error('MongoDB connection failed');
     }
 
     if (mongoose.connection.readyState === 1) {
@@ -24,7 +24,7 @@ const connectDB = async () => {
 
   } catch (error) {
     console.error('MongoDB Error:', error.message);
-    return null;
+    throw new Error('MongoDB connection failed');
   }
 };
 

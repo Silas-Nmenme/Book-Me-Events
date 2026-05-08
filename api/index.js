@@ -1,24 +1,34 @@
 const app = require('./app');
 const connectDB = require('./src/config/db');
 
-let isConnected = false;
+let cachedDb = null;
 
 module.exports = async (req, res) => {
   try {
-    if (!isConnected) {
-      await connectDB();
-      isConnected = true;
-      console.log('MongoDB Connected');
+    // Connect once per cold start
+    if (!cachedDb) {
+      const conn = await connectDB();
+
+      if (!conn) {
+        console.error("DB CONNECTION FAILED");
+
+        return res.status(500).json({
+          success: false,
+          message: "Database connection failed"
+        });
+      }
+
+      cachedDb = conn;
     }
 
-    app.handle(req, res);
+    return app(req, res);
 
   } catch (error) {
-    console.error('Vercel Function Error:', error);
+    console.error("Vercel Crash:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      error: error.message
+      message: error.message
     });
   }
 };
