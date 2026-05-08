@@ -1,24 +1,24 @@
 const app = require('./app');
 const connectDB = require('./src/config/db');
 
-let connected = false;
+let isConnected = false;
 
 module.exports = async (req, res) => {
   try {
-    if (!connected) {
+    if (!isConnected) {
       await connectDB();
-      connected = true;
-      console.log('MongoDB connected');
+      isConnected = true;
+      console.log('MongoDB Connected');
     }
 
-    return app(req, res);
+    app.handle(req, res);
 
   } catch (error) {
-    console.error(error);
+    console.error('Vercel Function Error:', error);
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      message: 'Server Error'
+      error: error.message
     });
   }
 };
