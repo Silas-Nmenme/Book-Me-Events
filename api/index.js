@@ -1,30 +1,27 @@
 const app = require('./app');
 const connectDB = require('./src/config/db');
 
-let cachedDb = null;
+let dbReady = false;
 
 module.exports = async (req, res) => {
   try {
-    // Connect once per cold start
-    if (!cachedDb) {
+    if (!dbReady) {
       const conn = await connectDB();
 
       if (!conn) {
-        console.error("DB CONNECTION FAILED");
-
         return res.status(500).json({
           success: false,
-          message: "Database connection failed"
+          message: 'Database connection failed'
         });
       }
 
-      cachedDb = conn;
+      dbReady = true;
     }
 
-    return app(req, res);
+    return app(req, res); //IMPORTANT CHANGE
 
   } catch (error) {
-    console.error("Vercel Crash:", error);
+    console.error('Vercel Error:', error);
 
     return res.status(500).json({
       success: false,
