@@ -4,6 +4,13 @@ const Vendor = require('../models/Vendor');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const Review = require('../models/Review');
+const { sendEmail } = require('../utils/emailClient');
+const {
+  vendorVerificationSuccessEmail,
+  vendorVerificationRejectedEmail,
+} = require('../utils/emailTemplates');
+
+
 
 // @desc    Get dashboard statistics
 // @route   GET /api/v1/admin/dashboard
@@ -96,7 +103,7 @@ exports.getPendingVendors = asyncHandler(async (req, res) => {
 // @route   PUT /api/v1/admin/vendors/:id/verify
 // @access  Private/Admin
 exports.verifyVendor = asyncHandler(async (req, res) => {
-  const vendor = await Vendor.findById(req.params.id);
+  const vendor = await Vendor.findById(req.params.id).populate('user', 'firstName lastName email');
 
   if (!vendor) {
     res.status(404);
@@ -107,6 +114,26 @@ exports.verifyVendor = asyncHandler(async (req, res) => {
   vendor.verificationDate = new Date();
   await vendor.save();
 
+  // Best-effort: do not fail verification if email fails
+  try {
+    const { subject, text, html } = vendorVerificationSuccessEmail({
+      recipientName: vendor.user?.firstName || vendor.user?.lastName || 'there',
+      vendorBusinessName: vendor.businessName,
+    });
+
+    if (vendor.user?.email) {
+      await sendEmail({
+        to: vendor.user.email,
+        subject,
+        text,
+        html,
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Vendor verification success email failed:', err.message);
+  }
+
   res.status(200).json({
     success: true,
     message: 'Vendor verified successfully',
@@ -114,17 +141,39 @@ exports.verifyVendor = asyncHandler(async (req, res) => {
   });
 });
 
+
 // @desc    Reject vendor
 // @route   PUT /api/v1/admin/vendors/:id/reject
 // @access  Private/Admin
 exports.rejectVendor = asyncHandler(async (req, res) => {
   const { reason } = req.body;
 
-  const vendor = await Vendor.findById(req.params.id);
+  const vendor = await Vendor.findById(req.params.id).populate('user', 'firstName lastName email');
 
   if (!vendor) {
     res.status(404);
     throw new Error('Vendor not found');
+  }
+
+  // Best-effort: email first, then delete
+  try {
+    const { subject, text, html } = vendorVerificationRejectedEmail({
+      recipientName: vendor.user?.firstName || vendor.user?.lastName || 'there',
+      businessName: vendor.businessName,
+      reason: reason || 'Please review your submission and try again.',
+    });
+
+    if (vendor.user?.email) {
+      await sendEmail({
+        to: vendor.user.email,
+        subject,
+        text,
+        html,
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Vendor verification rejected email failed:', err.message);
   }
 
   await Vendor.findByIdAndDelete(req.params.id);
@@ -134,6 +183,7 @@ exports.rejectVendor = asyncHandler(async (req, res) => {
     message: 'Vendor rejected and deleted',
   });
 });
+
 
 // @desc    Disable/Enable user
 // @route   PUT /api/v1/admin/users/:id/toggle-status

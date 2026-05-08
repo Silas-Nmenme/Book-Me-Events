@@ -2,6 +2,9 @@ const asyncHandler = require('express-async-handler');
 const Booking = require('../models/Booking');
 const Request = require('../models/Request');
 const Payment = require('../models/Payment');
+const { sendEmail } = require('../utils/emailClient');
+const { bookingCreatedEmail } = require('../utils/emailTemplates');
+
 
 // @desc    Get all bookings
 // @route   GET /api/v1/bookings
@@ -104,11 +107,39 @@ exports.createBooking = asyncHandler(async (req, res) => {
     specialRequests,
   });
 
+  // Send booking created email (best-effort)
+  try {
+    const bookingUser = await require('../models/User').findById(req.user.id);
+    const vendorName = serviceRequest.vendor?.businessName || serviceRequest.vendor?.vendorBusinessName || 'your vendor';
+    const serviceName = serviceRequest.service?.name || serviceRequest.service?.serviceName || 'your service';
+
+    const { subject, text, html } = bookingCreatedEmail({
+      firstName: bookingUser?.firstName,
+      vendorName,
+      serviceName,
+      bookingDate: eventDate,
+      bookingTime: booking?.eventTime || booking?.eventTimeSlot || '',
+    });
+
+    if (bookingUser?.email) {
+      await sendEmail({
+        to: bookingUser.email,
+        subject,
+        text,
+        html,
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Booking created email failed:', err.message);
+  }
+
   res.status(201).json({
     success: true,
     message: 'Booking created successfully',
     data: booking,
   });
+
 });
 
 // @desc    Update booking

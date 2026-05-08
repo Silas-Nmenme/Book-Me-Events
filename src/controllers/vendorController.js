@@ -2,6 +2,12 @@ const asyncHandler = require('express-async-handler');
 const Vendor = require('../models/Vendor');
 const Service = require('../models/Service');
 const User = require('../models/User');
+const { sendEmail } = require('../utils/emailClient');
+const {
+  vendorVerificationRequestedEmail,
+  adminNewVendorApprovalRequestEmail,
+} = require('../utils/emailTemplates');
+
 
 // @desc    Get all vendors
 // @route   GET /api/v1/vendors
@@ -101,7 +107,42 @@ exports.createVendor = asyncHandler(async (req, res) => {
   });
 
   // Update user role to VENDOR
-  await User.findByIdAndUpdate(req.user.id, { role: 'VENDOR' });
+  const updatedUser = await User.findByIdAndUpdate(req.user.id, { role: 'VENDOR' }, { new: true });
+
+  // Send emails (best-effort: don't fail request creation if email fails)
+  try {
+    const { subject, text, html } = vendorVerificationRequestedEmail({
+      recipientName: updatedUser?.firstName || updatedUser?.lastName || 'there',
+      businessName: vendor.businessName,
+    });
+
+    await sendEmail({
+      to: updatedUser.email,
+      subject,
+      text,
+      html,
+    });
+
+    const adminEmail = process.env.ADMIN_EMAIL || 'silasonyekachi15@gmail.com';
+    const adminName = process.env.ADMIN_NAME || 'Admin';
+
+    const { subject: adminSubject, text: adminText, html: adminHtml } = adminNewVendorApprovalRequestEmail({
+      adminName,
+      vendorBusinessName: vendor.businessName,
+      applicantName: updatedUser.firstName,
+      applicantEmail: updatedUser.email,
+    });
+
+    await sendEmail({
+      to: adminEmail,
+      subject: adminSubject,
+      text: adminText,
+      html: adminHtml,
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Vendor verification request emails failed:', err.message);
+  }
 
   res.status(201).json({
     success: true,
@@ -109,6 +150,7 @@ exports.createVendor = asyncHandler(async (req, res) => {
     data: vendor,
   });
 });
+
 
 // @desc    Update vendor profile
 // @route   PUT /api/v1/vendors/:id
