@@ -8,6 +8,7 @@ module.exports = async (req, res) => {
     if (!connected) {
       await connectDB();
       connected = true;
+      console.log('MongoDB connected');
     }
 
     return app(req, res);
@@ -17,7 +18,7 @@ module.exports = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: 'Internal Server Error'
+      message: 'Server Error'
     });
   }
 };
