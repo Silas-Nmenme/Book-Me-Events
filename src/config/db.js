@@ -7,7 +7,8 @@ const connectDB = async () => {
     if (!process.env.MONGO_URI) {
       const msg = 'MONGO_URI is missing (required for MongoDB)';
       console.error(msg);
-      throw new Error(msg);
+      // Avoid crashing Vercel serverless functions during cold start.
+      return null;
     }
 
     if (mongoose.connection.readyState === 1) {
@@ -27,7 +28,8 @@ const connectDB = async () => {
 
   } catch (error) {
     console.error('MongoDB Error:', error?.message || error);
-    throw new Error(error?.message || 'MongoDB connection failed');
+    // Avoid crashing Vercel serverless functions; caller will handle null.
+    return null;
   }
 };
 
