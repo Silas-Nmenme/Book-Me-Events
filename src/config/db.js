@@ -3,8 +3,9 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
   try {
     if (!process.env.MONGO_URI) {
-      console.error('MONGO_URI is missing');
-      throw new Error('MongoDB connection failed');
+      const msg = 'MONGO_URI is missing (required for MongoDB)';
+      console.error(msg);
+      throw new Error(msg);
     }
 
     if (mongoose.connection.readyState === 1) {
@@ -23,8 +24,8 @@ const connectDB = async () => {
     return conn;
 
   } catch (error) {
-    console.error('MongoDB Error:', error.message);
-    throw new Error('MongoDB connection failed');
+    console.error('MongoDB Error:', error?.message || error);
+    throw new Error(error?.message || 'MongoDB connection failed');
   }
 };
 

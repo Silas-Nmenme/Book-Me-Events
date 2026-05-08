@@ -22,10 +22,13 @@ module.exports = async (req, res) => {
 
   } catch (error) {
     console.error('Vercel Error:', error);
+    if (error?.stack) console.error(error.stack);
 
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error?.message || 'Internal server error',
+      // Helps you see the root cause in dev; remove if you prefer less detail.
+      debug: error?.stack,
     });
   }
 };
