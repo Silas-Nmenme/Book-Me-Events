@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
+    console.log('Env check: MONGO_URI present =', !!process.env.MONGO_URI);
+
     if (!process.env.MONGO_URI) {
       const msg = 'MONGO_URI is missing (required for MongoDB)';
       console.error(msg);
