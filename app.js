@@ -52,6 +52,8 @@ safeRoute('/api/v1/payments', require('./src/routes/paymentRoutes'));
 safeRoute('/api/v1/reviews', require('./src/routes/reviewRoutes'));
 safeRoute('/api/v1/messages', require('./src/routes/messageRoutes'));
 safeRoute('/api/v1/admin', require('./src/routes/adminRoutes'));
+safeRoute('/api/v1/uploads', require('./src/routes/uploadRoutes'));
+
 
 /**
  * ===== 404 HANDLER (SAFE) =====
