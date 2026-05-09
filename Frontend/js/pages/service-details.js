@@ -107,12 +107,15 @@ async function loadService(id) {
       return;
     }
 
-    // Backend request schema unknown; we use best-guess keys.
+    // Backend request schema (src/controllers/requestController.js):
+    // POST /api/v1/requests expects: { vendor, service, eventDate, eventLocation, eventDescription, guestCount, budgetAmount, notes, attachments }
+    // Minimal best-effort mapping from this page.
     const payload = {
-      serviceId: id,
-      vendorId: vendorId || undefined,
+      vendor: vendorId || undefined,
+      service: id,
       notes: `Requesting: ${title}`,
     };
+
 
     try {
       await apiFetch('/api/v1/requests', {
