@@ -104,6 +104,16 @@ exports.login = asyncHandler(async (req, res) => {
     throw new Error('Invalid credentials');
   }
 
+  // Debug: helps diagnose Vercel 500s during login
+  // (No sensitive data: only config state)
+  if (process.env.NODE_ENV === 'production') {
+    console.log('Login env check:', {
+      JWT_SECRET_present: !!process.env.JWT_SECRET,
+      DB_ready: !!global.__BME_DB_READY,
+    });
+  }
+
+
   // Check if password matches
   const isMatch = await user.matchPassword(password);
   if (!isMatch) {
