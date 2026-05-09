@@ -26,6 +26,8 @@ app.get('/', (req, res) => {
   });
 });
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.app';
+
 /**
  * ===== SAFE ROUTE LOADER =====
  * Prevents full crash if a route file has an error
@@ -64,6 +66,16 @@ app.use((req, res) => {
     message: `Route not found: ${req.originalUrl}`
   });
 });
+
+
+// CORS for frontend
+app.use(cors({
+  origin: [FRONTEND_URL, 'https://bookmeevent.netlify.app'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 
 /**
  * ===== ERROR HANDLER =====
