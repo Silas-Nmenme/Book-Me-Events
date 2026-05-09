@@ -11,7 +11,8 @@ const app = express();
 /**
  * ===== CORE MIDDLEWARE =====
  */
-app.use(cors());
+// CORS is configured in server.js (including FRONTEND_URL). Avoid double/undefined CORS here.
+// app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use(morgan('dev'));
@@ -30,6 +31,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.ap
 
 /**
  * ===== SAFE ROUTE LOADER =====
+
  * Prevents full crash if a route file has an error
  */
 const safeRoute = (path, route) => {
