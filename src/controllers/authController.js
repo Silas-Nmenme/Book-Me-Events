@@ -49,7 +49,19 @@ exports.register = asyncHandler(async (req, res) => {
   user.password = undefined;
 
   // Generate token
-  const token = generateToken(user._id);
+  if (!process.env.JWT_SECRET) {
+    res.status(500);
+    throw new Error('Server misconfiguration: JWT_SECRET is missing');
+  }
+
+  let token;
+  try {
+    token = generateToken(user._id);
+  } catch (err) {
+    res.status(500);
+    throw new Error(`Token generation failed: ${err.message}`);
+  }
+
 
   // Send welcome email (best-effort: don't fail registration if email fails)
   try {
@@ -103,7 +115,19 @@ exports.login = asyncHandler(async (req, res) => {
   user.password = undefined;
 
   // Generate token
-  const token = generateToken(user._id);
+  if (!process.env.JWT_SECRET) {
+    res.status(500);
+    throw new Error('Server misconfiguration: JWT_SECRET is missing');
+  }
+
+  let token;
+  try {
+    token = generateToken(user._id);
+  } catch (err) {
+    res.status(500);
+    throw new Error(`Token generation failed: ${err.message}`);
+  }
+
 
   // Send login email (best-effort: don't fail login if email fails)
   try {
