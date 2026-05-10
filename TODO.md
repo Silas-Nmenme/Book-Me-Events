@@ -1,23 +1,17 @@
-# TODO - Email templates update
+# TODO - Book Me Events (rewrite plan)
 
-## Step 1
-- ✅ Locate existing email templates and call sites.
+## Phase 1: Deployment compatibility (Netlify frontend + Vercel backend)
+- [x] Initial repo inspection and route contract confirmation.
+- [ ] Ensure frontend always calls the correct backend base URL (Vercel URL) even in production.
+- [ ] Add better API error logging toast for failed fetches.
 
-## Step 2
-- ✅ Confirm email sending flow uses src/utils/emailTemplates.js via authController.js.
+## Phase 2: Frontend rewrite (landing + auth)
+- [ ] Create/upgrade Landing page header with prominent Login/Register buttons.
+- [ ] Implement landing CTA behavior.
+- [ ] Make auth pages use consistent token storage + redirect.
 
-## Step 3
-- ✅ Update src/utils/emailTemplates.js:
-  - Add Bootstrap 5 CDN in email HTML.
-  - Redesign email layout to look more professional.
-  - Add subtle CSS animations (hero fade/slide, button hover/pulse) with safe fallbacks.
-  - Keep existing template function signatures/exports for backward compatibility.
+## Phase 3: Smoke tests
+- [ ] Verify backend endpoints work: `/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/me`.
+- [ ] Verify deployed flow: Landing -> Register -> Login -> Profile.
 
-
-## Step 4
-- 🔧 Add additional template functions for vendor/admin use cases (exported, not yet wired).
-
-
-## Step 5
-- 🧪 Run a quick Node syntax check / lint if available.
 
