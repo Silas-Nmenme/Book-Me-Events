@@ -102,3 +102,284 @@ export async function fetchMe() {
   return apiFetch('/api/v1/auth/me', { method: 'GET' });
 }
 
+// =====================
+// Requests
+// =====================
+export async function getRequests({ status, page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  const qsStr = params.toString();
+  return apiFetch(`/api/v1/requests${qsStr ? `?${qsStr}` : ''}`, { method: 'GET' });
+}
+
+export async function getRequest(id) {
+  return apiFetch(`/api/v1/requests/${id}`, { method: 'GET' });
+}
+
+export async function createRequest(payload) {
+  return apiFetch('/api/v1/requests', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function acceptRequest(id) {
+  return apiFetch(`/api/v1/requests/${id}/accept`, { method: 'PUT' });
+}
+
+export async function declineRequest(id) {
+  return apiFetch(`/api/v1/requests/${id}/decline`, { method: 'PUT' });
+}
+
+export async function cancelRequest(id, payload = {}) {
+  return apiFetch(`/api/v1/requests/${id}/cancel`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateRequest(id, payload) {
+  return apiFetch(`/api/v1/requests/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+// =====================
+// Bookings
+// =====================
+export async function getBookings({ status, page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  const qsStr = params.toString();
+  return apiFetch(`/api/v1/bookings${qsStr ? `?${qsStr}` : ''}`, { method: 'GET' });
+}
+
+export async function getBooking(id) {
+  return apiFetch(`/api/v1/bookings/${id}`, { method: 'GET' });
+}
+
+export async function createBooking(payload) {
+  return apiFetch('/api/v1/bookings', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateBooking(id, payload) {
+  return apiFetch(`/api/v1/bookings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function cancelBooking(id, payload = {}) {
+  return apiFetch(`/api/v1/bookings/${id}/cancel`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function completeBooking(id) {
+  return apiFetch(`/api/v1/bookings/${id}/complete`, { method: 'PUT' });
+}
+
+export async function deleteBooking(id) {
+  return apiFetch(`/api/v1/bookings/${id}`, { method: 'DELETE' });
+}
+
+// =====================
+// Messages
+// =====================
+export async function getMessages({ conversation, page = 1, limit = 20 } = {}) {
+  const params = new URLSearchParams();
+  if (conversation) params.set('conversation', conversation);
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  const qsStr = params.toString();
+  return apiFetch(`/api/v1/messages${qsStr ? `?${qsStr}` : ''}`, { method: 'GET' });
+}
+
+export async function getUnreadCount() {
+  return apiFetch('/api/v1/messages/unread/count', { method: 'GET' });
+}
+
+export async function getConversation(userId, { page = 1, limit = 20 } = {}) {
+  const params = new URLSearchParams();
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  const qsStr = params.toString();
+  return apiFetch(`/api/v1/messages/conversation/${userId}${qsStr ? `?${qsStr}` : ''}`, { method: 'GET' });
+}
+
+export async function getMessage(id) {
+  return apiFetch(`/api/v1/messages/${id}`, { method: 'GET' });
+}
+
+export async function sendMessage(payload) {
+  return apiFetch('/api/v1/messages', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function markMessageAsRead(id) {
+  return apiFetch(`/api/v1/messages/${id}/read`, { method: 'PUT' });
+}
+
+export async function deleteMessage(id) {
+  return apiFetch(`/api/v1/messages/${id}`, { method: 'DELETE' });
+}
+
+// =====================
+// Payments
+// =====================
+export async function getPayments({ status, page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  const qsStr = params.toString();
+  return apiFetch(`/api/v1/payments${qsStr ? `?${qsStr}` : ''}`, { method: 'GET' });
+}
+
+export async function getPayment(id) {
+  return apiFetch(`/api/v1/payments/${id}`, { method: 'GET' });
+}
+
+export async function getPaymentByRef(ref) {
+  return apiFetch(`/api/v1/payments/ref/${encodeURIComponent(ref)}`, { method: 'GET' });
+}
+
+export async function createPayment(payload) {
+  return apiFetch('/api/v1/payments', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function refundPayment(id, payload = {}) {
+  return apiFetch(`/api/v1/payments/${id}/refund`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// =====================
+// Reviews
+// =====================
+export async function getReviews({ vendor, page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (vendor) params.set('vendor', vendor);
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  const qsStr = params.toString();
+  return apiFetch(`/api/v1/reviews${qsStr ? `?${qsStr}` : ''}`, { method: 'GET' });
+}
+
+export async function getReview(id) {
+  return apiFetch(`/api/v1/reviews/${id}`, { method: 'GET' });
+}
+
+export async function createReview(payload) {
+  return apiFetch('/api/v1/reviews', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateReview(id, payload) {
+  return apiFetch(`/api/v1/reviews/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteReview(id) {
+  return apiFetch(`/api/v1/reviews/${id}`, { method: 'DELETE' });
+}
+
+export async function addVendorResponse(id, payload) {
+  return apiFetch(`/api/v1/reviews/${id}/vendor-response`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function markReviewHelpful(id) {
+  return apiFetch(`/api/v1/reviews/${id}/helpful`, { method: 'PUT' });
+}
+
+export async function markReviewUnhelpful(id) {
+  return apiFetch(`/api/v1/reviews/${id}/unhelpful`, { method: 'PUT' });
+}
+
+// =====================
+// Admin
+// =====================
+export async function getAdminDashboard() {
+  return apiFetch('/api/v1/admin/dashboard', { method: 'GET' });
+}
+
+export async function getPendingVendors({ page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  return apiFetch(`/api/v1/admin/vendors/pending?${params.toString()}`, { method: 'GET' });
+}
+
+export async function verifyVendor(vendorId) {
+  return apiFetch(`/api/v1/admin/vendors/${vendorId}/verify`, { method: 'PUT' });
+}
+
+export async function rejectVendor(vendorId, payload = {}) {
+  return apiFetch(`/api/v1/admin/vendors/${vendorId}/reject`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAdminUsers({ role, page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (role) params.set('role', role);
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  return apiFetch(`/api/v1/admin/users?${params.toString()}`, { method: 'GET' });
+}
+
+export async function toggleUserStatus(userId) {
+  return apiFetch(`/api/v1/admin/users/${userId}/toggle-status`, { method: 'PUT' });
+}
+
+export async function getAdminBookings({ status, page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  return apiFetch(`/api/v1/admin/bookings?${params.toString()}`, { method: 'GET' });
+}
+
+export async function getAdminPayments({ status, page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (page) params.set('page', page);
+  if (limit) params.set('limit', limit);
+  return apiFetch(`/api/v1/admin/payments?${params.toString()}`, { method: 'GET' });
+}
+
+export async function getAdminStats() {
+  return apiFetch('/api/v1/admin/stats', { method: 'GET' });
+}
+
+export async function sendAnnouncement(payload) {
+  return apiFetch('/api/v1/admin/announcements', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+
