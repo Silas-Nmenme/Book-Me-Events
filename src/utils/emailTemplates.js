@@ -128,14 +128,22 @@ function buildInfoRow({ label, value }) {
   `;
 }
 
-
-function welcomeEmail({ firstName }) {
+function welcomeEmail({ firstName, verificationLink }) {
   const safeFirstName = escapeHtml(firstName || 'there');
   const subject = `Welcome to ${APP_NAME}`;
-  const text = `Hi ${safeFirstName},\n\nWelcome to ${APP_NAME}!\n\nVerify your email by signing in and calling /api/v1/auth/verify-email.\n`;
+
+  const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.app';
+  const safeVerificationLink = String(
+    verificationLink || `${FRONTEND_URL.replace(/\/+$/, '')}/auth-login.html`
+  ).trim();
+
+  const text = `Hi ${safeFirstName},\n\nWelcome to ${APP_NAME}!\n\nVerify your email by signing in: ${safeVerificationLink}\n`;
+
   const html = buildBaseHtml({
     title: 'Welcome!',
-    bodyHtml: `<p style="margin:0 0 12px;">Hi <b>${safeFirstName}</b>,</p><p style="margin:0 0 12px;">Welcome to <b>${escapeHtml(APP_NAME)}</b>!</p><p style="margin:0;color:#6b7280;">To complete verification, sign in and call <code style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,\"Liberation Mono\",\"Courier New\",monospace;background:#f3f4f6;padding:2px 6px;border-radius:8px;">/api/v1/auth/verify-email</code>.</p>`,
+    bodyHtml: `<p style="margin:0 0 12px;">Hi <b>${safeFirstName}</b>,</p><p style="margin:0 0 12px;">Welcome to <b>${escapeHtml(APP_NAME)}</b>!</p><p style="margin:0;color:#6b7280;">To complete verification, sign in using the link below.</p>`,
+    ctaText: 'Sign in to verify',
+    ctaHref: safeVerificationLink,
   });
 
   return { subject, text, html };
@@ -379,5 +387,4 @@ module.exports = {
   adminNewVendorApprovalRequestEmail,
   bookingCreatedEmail,
 };
-
 

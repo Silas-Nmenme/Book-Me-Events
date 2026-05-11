@@ -238,10 +238,9 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 
 
  
-    const apiBaseUrl = process.env.API_URL || process.env.APP_URL;
-    const resetUrl = apiBaseUrl
-      ? `${apiBaseUrl.replace(/\/+$/, '')}/api/v1/auth/reset-password/${resetToken}`
-      : `/api/v1/auth/reset-password/${resetToken}`;
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.app';
+    const resetUrl = `${FRONTEND_URL.replace(/\/+$/, '')}/reset-password.html?token=${encodeURIComponent(resetToken)}`;
+
 
 
     const { subject, text, html } = passwordResetRequestedEmail({
