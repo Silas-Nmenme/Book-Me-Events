@@ -13,9 +13,10 @@ const {
 
 // Public routes
 router.post('/register', register);
-router.post('/login', login);
+router.post('/login', express.json(), login);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
+
 
 // Protected routes
 router.post('/logout', protect, logout);
