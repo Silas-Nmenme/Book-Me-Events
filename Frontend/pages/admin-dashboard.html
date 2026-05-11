@@ -105,7 +105,8 @@
     <script type="module">
       import { fetchMe, logoutUser, clearToken } from '../js/api.js';
       import { toast, setYear } from '../js/ui.js';
-
+      import { initThemeToggle } from '../js/theme-toggle.js';
+      initThemeToggle();
       setYear('year');
 
       function getAvatarInitials(name) {
