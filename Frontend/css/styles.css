@@ -202,10 +202,57 @@ body{
 /* Default Bootstrap text utilities sometimes end up inheriting incorrect colors in dark mode */
 :root:not([data-theme="light"]) .text-muted,
 :root:not([data-theme="light"]) .text-body,
-:root:not([data-theme="light"]) .lead{
+:root:not([data-theme="light"]) .lead,
+:root:not([data-theme="light"]) .text-muted-soft{
   color: var(--text) !important;
 }
 
+
+/* Some pages may use Bootstrap default text colors that can become dark in dark mode.
+   Force any element that does not explicitly opt out to inherit readable theme color. */
+:root:not([data-theme="light"]) .text-dark,
+:root:not([data-theme="light"]) .text-body,
+:root:not([data-theme="light"]) .text-muted{
+  color: var(--text) !important;
+}
+
+.navbar .nav-link,
+.navbar-brand,
+.navbar .dropdown-item{
+  color: inherit;
+}
+
+.card-glass,
+.navbar-glass{
+  color: var(--text);
+}
+
+.card-glass * ,
+.navbar-glass *{
+  color: inherit;
+}
+
+.footer{
+  color: inherit;
+}
+
+.footer *{
+  color: inherit;
+}
+
+.form-control,
+.form-select{
+  color: inherit;
+}
+
+.form-text,
+.form-label{
+  color: inherit;
+}
+
+.text-muted-soft{color: var(--mutedText) !important;}
+
+.text-white{color: #fff !important;}
 
 .btn-brand{
   background: linear-gradient(135deg, var(--brand), var(--brand2));
