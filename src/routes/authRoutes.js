@@ -10,6 +10,8 @@ const {
   forgotPassword,
   resetPassword,
 } = require('../controllers/authController');
+const { sendVerificationEmail } = require('../controllers/verifyEmailController');
+
 
 // Public routes
 router.post('/register', register);
@@ -22,6 +24,8 @@ router.post('/reset-password/:token', resetPassword);
 router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
 router.post('/verify-email', protect, verifyEmail);
+router.post('/send-verification-email', protect, sendVerificationEmail);
 
 
 module.exports = router;
+

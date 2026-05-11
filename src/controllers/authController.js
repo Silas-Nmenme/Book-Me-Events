@@ -9,6 +9,13 @@ const {
   loginSuccessEmail,
 } = require('../utils/emailTemplates');
 
+const jwt = require('jsonwebtoken');
+const {
+  createEmailVerificationToken,
+  verifyEmailVerificationToken,
+} = require('../utils/emailVerification');
+
+
 
 
 // @desc    Register user
@@ -65,7 +72,8 @@ exports.register = asyncHandler(async (req, res) => {
 
   // Send welcome email (best-effort: don't fail registration if email fails)
   try {
-    const { subject, text, html } = welcomeEmail({ firstName: user.firstName });
+    const { subject, text, html } = welcomeEmail({ firstName: user.firstName, role: user.role });
+
     await sendEmail({
       to: user.email,
       subject,
@@ -191,18 +199,62 @@ exports.getMe = asyncHandler(async (req, res) => {
 // @route   POST /api/v1/auth/verify-email
 // @access  Private
 exports.verifyEmail = asyncHandler(async (req, res) => {
+  const token =
+    (req.body && req.body.token) ||
+    (req.query && req.query.token) ||
+    undefined;
+
+
+  if (!process.env.JWT_SECRET) {
+    res.status(500);
+    throw new Error('Server misconfiguration: JWT_SECRET is missing');
+  }
+
+  // Preferred: verify signed token from the email link.
+  if (token) {
+    let decoded;
+    try {
+      decoded = verifyEmailVerificationToken(token);
+    } catch (e) {
+
+      res.status(400);
+      throw new Error('Invalid or expired verification token');
+    }
+
+
+    await User.findByIdAndUpdate(
+      decoded.id,
+
+      { isVerified: true },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Email verified successfully',
+      data: user,
+    });
+  }
+
+  // Fallback: old behavior (requires authentication).
   const user = await User.findByIdAndUpdate(
     req.user.id,
     { isVerified: true },
     { new: true, runValidators: true }
   );
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: 'Email verified successfully',
     data: user,
   });
 });
+
 
 // @desc    Forgot password
 // @route   POST /api/v1/auth/forgot-password

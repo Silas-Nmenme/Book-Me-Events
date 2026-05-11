@@ -128,9 +128,12 @@ function buildInfoRow({ label, value }) {
   `;
 }
 
-function welcomeEmail({ firstName, verificationLink }) {
+function welcomeEmail({ firstName, role, verificationLink }) {
+  const safeRole = escapeHtml(role || 'USER');
+
   const safeFirstName = escapeHtml(firstName || 'there');
   const subject = `Welcome to ${APP_NAME}`;
+
 
   const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.app';
   const safeVerificationLink = String(
@@ -139,12 +142,15 @@ function welcomeEmail({ firstName, verificationLink }) {
 
   const text = `Hi ${safeFirstName},\n\nWelcome to ${APP_NAME}!\n\nVerify your email by signing in: ${safeVerificationLink}\n`;
 
+  const ctaText = safeRole === 'VENDOR' ? 'Verify your vendor email' : 'Verify your email';
   const html = buildBaseHtml({
     title: 'Welcome!',
-    bodyHtml: `<p style="margin:0 0 12px;">Hi <b>${safeFirstName}</b>,</p><p style="margin:0 0 12px;">Welcome to <b>${escapeHtml(APP_NAME)}</b>!</p><p style="margin:0;color:#6b7280;">To complete verification, sign in using the link below.</p>`,
-    ctaText: 'Sign in to verify',
+    statusLabel: 'Action required',
+    bodyHtml: `<p style="margin:0 0 12px;">Hi <b>${safeFirstName}</b>,</p><p style="margin:0 0 12px;">Welcome to <b>${escapeHtml(APP_NAME)}</b>!</p><p style="margin:0;color:#6b7280;">To complete verification, click the button below. This email verifies your account and unlocks full access.</p>`,
+    ctaText,
     ctaHref: safeVerificationLink,
   });
+
 
   return { subject, text, html };
 }
