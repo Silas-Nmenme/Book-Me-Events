@@ -1,11 +1,10 @@
-# TODO - Book Me Events Frontend/Backend Refresh
+# TODO
 
-- [x] Step 1: Remove existing frontend files (except keep `Frontend/_redirects`).
-- [x] Step 2: Create `Frontend/constant.js` with backend URL.
-- [x] Step 3: Create shared frontend JS helpers: `Frontend/js/api.js`, `Frontend/js/auth.js`, `Frontend/js/ui.js`.
-- [x] Step 4: Rebuild landing page `Frontend/pages/index.html` (hero + services offered + header dropdown).
-- [x] Step 5: Rebuild auth pages with header/footer: login, register, forgot-password, reset-password.
-- [x] Step 6: Create post-login router `Frontend/pages/profile.html` and role dashboards (`user`, `vendor`, `admin`).
-- [x] Step 9: Tighten backend CORS to allow only `https://bookmeevent.netlify.app`.
-- [ ] Step 10: Quick sanity checks: ensure all script/link paths are correct.
+## Frontend: Services / Requests / Messages / Bookings
+- [ ] Create `Frontend/pages/services.html` + `Frontend/js/pages/services.js` (role-aware USER/VENDOR UI, uses `Frontend/js/api.js`)
+- [ ] Create `Frontend/pages/requests.html` + `Frontend/js/pages/requests.js` (list + actions: accept/decline/cancel/update)
+- [ ] Create `Frontend/pages/messages.html` + `Frontend/js/pages/messages.js` (conversation list + send + mark read)
+- [ ] Create `Frontend/pages/bookings.html` + `Frontend/js/pages/bookings.js` (list + actions: complete/cancel/update/delete)
+- [ ] Update `Frontend/pages/vendor-dashboard.html` to include link to `bookings.html`
+- [ ] Smoke-test all new pages with USER and VENDOR roles (session load, actions trigger, toasts show)
 
