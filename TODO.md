@@ -1,17 +1,11 @@
-# TODO - Book Me Events (rewrite plan)
+# TODO - Book Me Events Frontend/Backend Refresh
 
-## Phase 1: Deployment compatibility (Netlify frontend + Vercel backend)
-- [x] Initial repo inspection and route contract confirmation.
-- [ ] Ensure frontend always calls the correct backend base URL (Vercel URL) even in production.
-- [ ] Add better API error logging toast for failed fetches.
-
-## Phase 2: Frontend rewrite (landing + auth)
-- [ ] Create/upgrade Landing page header with prominent Login/Register buttons.
-- [ ] Implement landing CTA behavior.
-- [ ] Make auth pages use consistent token storage + redirect.
-
-## Phase 3: Smoke tests
-- [ ] Verify backend endpoints work: `/api/v1/auth/register`, `/api/v1/auth/login`, `/api/v1/auth/me`.
-- [ ] Verify deployed flow: Landing -> Register -> Login -> Profile.
-
+- [x] Step 1: Remove existing frontend files (except keep `Frontend/_redirects`).
+- [x] Step 2: Create `Frontend/constant.js` with backend URL.
+- [x] Step 3: Create shared frontend JS helpers: `Frontend/js/api.js`, `Frontend/js/auth.js`, `Frontend/js/ui.js`.
+- [x] Step 4: Rebuild landing page `Frontend/pages/index.html` (hero + services offered + header dropdown).
+- [x] Step 5: Rebuild auth pages with header/footer: login, register, forgot-password, reset-password.
+- [x] Step 6: Create post-login router `Frontend/pages/profile.html` and role dashboards (`user`, `vendor`, `admin`).
+- [x] Step 9: Tighten backend CORS to allow only `https://bookmeevent.netlify.app`.
+- [ ] Step 10: Quick sanity checks: ensure all script/link paths are correct.
 

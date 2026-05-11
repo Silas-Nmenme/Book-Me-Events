@@ -27,7 +27,8 @@ app.get('/', (req, res) => {
   });
 });
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.app';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.app'; // kept for logging/back-compat
+
 
 /**
  * ===== SAFE ROUTE LOADER =====
@@ -72,7 +73,7 @@ app.use((req, res) => {
 
 // CORS for frontend
 app.use(cors({
-  origin: [FRONTEND_URL, 'https://bookmeevent.netlify.app'],
+  origin: ['https://bookmeevent.netlify.app'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
