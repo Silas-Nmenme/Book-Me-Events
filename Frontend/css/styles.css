@@ -100,6 +100,12 @@ body{
   color: var(--mutedText) !important;
 }
 
+/* Ensure dark mode (default) readable text when pages rely on bootstrap text classes */
+:root:not([data-theme="light"]) .text-muted-soft{
+  color: var(--mutedText) !important;
+}
+
+
 /* Theme toggle button */
 .bme-theme-toggle{
   width: 40px;
@@ -191,7 +197,15 @@ body{
   color:transparent;
 }
 
-.text-muted-soft{color: rgba(233,234,242,.72) !important;}
+.text-muted-soft{color: var(--mutedText) !important;}
+
+/* Default Bootstrap text utilities sometimes end up inheriting incorrect colors in dark mode */
+:root:not([data-theme="light"]) .text-muted,
+:root:not([data-theme="light"]) .text-body,
+:root:not([data-theme="light"]) .lead{
+  color: var(--text) !important;
+}
+
 
 .btn-brand{
   background: linear-gradient(135deg, var(--brand), var(--brand2));
@@ -199,7 +213,7 @@ body{
   color:#0b0f1c;
   font-weight:800;
 }
-.btn-brand:hover{filter: brightness(1.05); color:#0b0f1c;}
+.btn-brand:hover{filter: brightness(1.05); color: #0b0f1c;}
 
 .btn-soft{
   background: rgba(255,255,255,.06);
@@ -223,4 +237,56 @@ body{
 }
 
 .section{padding: 64px 0;}
+
+/* ==============================
+   Readability: enforce text color by theme
+   Default requirement:
+   - dark theme: white-ish text
+   - light theme: black text
+   Exceptions are handled by existing explicit colors (e.g. .text-white).
+   ============================== */
+
+/* Base text color for all pages */
+:root:not([data-theme="light"]) body{
+  color: var(--text) !important;
+}
+
+:root[data-theme="light"] body{
+  color: var(--text) !important;
+}
+
+/* Bootstrap utility classes that may override readability */
+:root:not([data-theme="light"]) .text-body,
+:root:not([data-theme="light"]) .lead,
+:root:not([data-theme="light"]) .text-muted{
+  color: var(--text) !important;
+}
+
+:root[data-theme="light"] .text-body,
+:root[data-theme="light"] .lead,
+:root[data-theme="light"] .text-muted{
+  color: var(--mutedText) !important;
+}
+
+/* Ensure form labels / plain paragraphs / headings follow theme */
+:root body p,
+:root body h1,
+:root body h2,
+:root body h3,
+:root body h4,
+:root body h5,
+:root body h6,
+:root body label,
+:root body div,
+:root body span{
+  color: inherit;
+}
+
+/* Inputs already have their own styling; keep them readable */
+:root body input,
+:root body textarea,
+:root body select{
+  color: var(--inputText);
+}
+
 
