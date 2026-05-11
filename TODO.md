@@ -1,10 +1,10 @@
 # TODO
+- [x] Implement dark/light theme toggle with readable text contrast (CSS + JS module started)
+- [x] Add toggle JS module (Frontend/js/theme-toggle.js)
+- [x] Update styles.css to support light theme + ensure all text is readable
 
-## Frontend: Services / Requests / Messages / Bookings
-- [ ] Create `Frontend/pages/services.html` + `Frontend/js/pages/services.js` (role-aware USER/VENDOR UI, uses `Frontend/js/api.js`)
-- [ ] Create `Frontend/pages/requests.html` + `Frontend/js/pages/requests.js` (list + actions: accept/decline/cancel/update)
-- [ ] Create `Frontend/pages/messages.html` + `Frontend/js/pages/messages.js` (conversation list + send + mark read)
-- [ ] Create `Frontend/pages/bookings.html` + `Frontend/js/pages/bookings.js` (list + actions: complete/cancel/update/delete)
-- [ ] Update `Frontend/pages/vendor-dashboard.html` to include link to `bookings.html`
-- [ ] Smoke-test all new pages with USER and VENDOR roles (session load, actions trigger, toasts show)
+- [x] Add round moon/sun toggle button in navbar (index: after account dropdown) and other (Frontend/pages)
+- [x] Add toggle init call in every page that includes the toggle button
+- [ ] Quick manual verification across multiple pages
+
 
