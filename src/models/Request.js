@@ -17,9 +17,9 @@ const requestSchema = new mongoose.Schema(
       default: 'PENDING' 
     },
     notes: { type: String },
-    attachments: [{ type: String }],
     responseDeadline: { type: Date },
   },
+
   { timestamps: true }
 );
 

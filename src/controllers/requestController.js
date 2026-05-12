@@ -4,6 +4,7 @@ const Service = require('../models/Service');
 const Vendor = require('../models/Vendor');
 
 // @desc    Get all requests
+
 // @route   GET /api/v1/requests
 // @access  Private
 exports.getRequests = asyncHandler(async (req, res) => {
@@ -18,10 +19,11 @@ exports.getRequests = asyncHandler(async (req, res) => {
   // Vendors see requests for their services, Users see their own requests
   if (req.user.role === 'VENDOR') {
     const vendor = await Vendor.findOne({ user: req.user.id });
-    filter.vendor = vendor._id;
+    if (vendor) filter.vendor = vendor._id;
   } else if (req.user.role === 'USER') {
     filter.user = req.user.id;
   }
+
 
   const skip = (page - 1) * limit;
 
@@ -70,7 +72,6 @@ exports.getRequest = asyncHandler(async (req, res) => {
 // @access  Private (User only)
 exports.createRequest = asyncHandler(async (req, res) => {
   const {
-    vendor,
     service,
     eventDate,
     eventLocation,
@@ -78,35 +79,25 @@ exports.createRequest = asyncHandler(async (req, res) => {
     guestCount,
     budgetAmount,
     notes,
-    attachments,
   } = req.body;
 
-  // Vendor is required for correct vendor visibility filtering
+  if (!service) {
+    res.status(400);
+    throw new Error('Service is required');
+  }
+
+  const serviceExists = await Service.findById(service);
+  if (!serviceExists) {
+    res.status(400);
+    throw new Error('Service not found');
+  }
+
+  const vendor = serviceExists.vendor;
   if (!vendor) {
     res.status(400);
-    throw new Error('Vendor is required');
+    throw new Error('Service vendor not found');
   }
 
-  const vendorExists = await Vendor.findById(vendor);
-  if (!vendorExists) {
-    res.status(400);
-    throw new Error('Vendor not found');
-  }
-
-  // If a service is provided, ensure it belongs to the selected vendor
-  if (service) {
-    // Service model relationship is: Service belongs to a vendor (field is commonly `vendor`)
-    const serviceExists = await Service.findById(service);
-    if (!serviceExists) {
-      res.status(400);
-      throw new Error('Service not found');
-    }
-
-    if (serviceExists.vendor?.toString() !== vendor.toString()) {
-      res.status(400);
-      throw new Error('Selected service does not belong to the selected vendor');
-    }
-  }
 
   // Convert/validate eventDate early for clearer 400s
   const parsedEventDate = eventDate ? new Date(eventDate) : null;
@@ -135,9 +126,9 @@ exports.createRequest = asyncHandler(async (req, res) => {
     guestCount,
     budgetAmount,
     notes,
-    attachments,
     responseDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
   });
+
 
   res.status(201).json({
     success: true,
