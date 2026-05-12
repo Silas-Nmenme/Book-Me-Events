@@ -99,11 +99,13 @@ exports.createService = asyncHandler(async (req, res) => {
     finalImages = urls;
   }
 
-  // Check if user is a vendor
+  // Authorization: rely on vendor profile existence for this authenticated user.
   const vendor = await Vendor.findOne({ user: req.user.id });
   if (!vendor) {
     res.status(403);
-    throw new Error('Only vendors can create services');
+    throw new Error(
+      `Only vendors can create services (vendor profile missing for user ${req.user?.id}).`
+    );
   }
 
   const service = await Service.create({
