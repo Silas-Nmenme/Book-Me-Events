@@ -81,11 +81,55 @@ exports.createRequest = asyncHandler(async (req, res) => {
     attachments,
   } = req.body;
 
+  // Vendor is required for correct vendor visibility filtering
+  if (!vendor) {
+    res.status(400);
+    throw new Error('Vendor is required');
+  }
+
+  const vendorExists = await Vendor.findById(vendor);
+  if (!vendorExists) {
+    res.status(400);
+    throw new Error('Vendor not found');
+  }
+
+  // If a service is provided, ensure it belongs to the selected vendor
+  if (service) {
+    // Service model relationship is: Service belongs to a vendor (field is commonly `vendor`)
+    const serviceExists = await Service.findById(service);
+    if (!serviceExists) {
+      res.status(400);
+      throw new Error('Service not found');
+    }
+
+    if (serviceExists.vendor?.toString() !== vendor.toString()) {
+      res.status(400);
+      throw new Error('Selected service does not belong to the selected vendor');
+    }
+  }
+
+  // Convert/validate eventDate early for clearer 400s
+  const parsedEventDate = eventDate ? new Date(eventDate) : null;
+  if (!parsedEventDate || Number.isNaN(parsedEventDate.getTime())) {
+    res.status(400);
+    throw new Error('Valid eventDate is required');
+  }
+
+  if (!eventLocation) {
+    res.status(400);
+    throw new Error('eventLocation is required');
+  }
+
+  if (!eventDescription) {
+    res.status(400);
+    throw new Error('eventDescription is required');
+  }
+
   const request = await Request.create({
     user: req.user.id,
     vendor,
-    service,
-    eventDate,
+    service: service || undefined,
+    eventDate: parsedEventDate,
     eventLocation,
     eventDescription,
     guestCount,
@@ -101,6 +145,7 @@ exports.createRequest = asyncHandler(async (req, res) => {
     data: request,
   });
 });
+
 
 // @desc    Accept service request (Vendor)
 // @route   PUT /api/v1/requests/:id/accept
