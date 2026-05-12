@@ -8,6 +8,259 @@ const {
   adminNewVendorApprovalRequestEmail,
 } = require('../utils/emailTemplates');
 
+// ===============================
+// Vendor multi-step OTP + profile
+// ===============================
+function generateSixDigitOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function otpExpiryMs() {
+  const minutes = Number(process.env.JWT_OTP_EXPIRE_MINUTES || 10);
+  return minutes * 60 * 1000;
+}
+
+async function sendVendorOtpEmail({ user }) {
+  const otp = user.otpCode;
+  const subject = `Your ${process.env.APP_NAME || 'Book Me Events'} OTP verification code`;
+  const text = `Hi ${user.firstName},\n\nYour OTP code is: ${otp}\nThis code expires in ${Number(process.env.JWT_OTP_EXPIRE_MINUTES || 10)} minutes.\n`;
+
+  // best-effort
+  await sendEmail({
+    to: user.email,
+    subject,
+    text,
+    html: `<p>${text.replace(/\n/g, '<br/>')}</p>`,
+  });
+}
+
+// ===============================
+// Vendor multi-step OTP + profile
+// Endpoints mounted under:
+// POST /api/v1/vendors/register/page1
+// POST /api/v1/vendors/register/page2
+// POST /api/v1/vendors/register/page3
+// POST /api/v1/vendors/register/verify-otp
+// ===============================
+
+// @desc    Vendor Register - Page 1 (create vendor user + send OTP)
+// @route   POST /api/v1/vendors/register/page1
+// @access  Public
+exports.vendorRegisterPage1 = asyncHandler(async (req, res) => {
+  const { firstName, lastName, email, phone, password, passwordConfirm } = req.body;
+
+  if (!firstName || !lastName || !email || !phone || !password || !passwordConfirm) {
+    res.status(400);
+    throw new Error('Please provide all required fields');
+  }
+
+  if (password !== passwordConfirm) {
+    res.status(400);
+    throw new Error('Passwords do not match');
+  }
+
+  const normalizedEmail = email.toLowerCase();
+
+  const userExists = await User.findOne({ email: normalizedEmail });
+  if (userExists) {
+    res.status(400);
+    throw new Error('Email already registered');
+  }
+
+  const user = await User.create({
+    firstName,
+    lastName,
+    email: normalizedEmail,
+    phone,
+    password,
+    role: 'VENDOR',
+    isVerified: false,
+  });
+
+  const otp = generateSixDigitOtp();
+  user.otpCode = otp;
+  user.otpExpiresAt = new Date(Date.now() + otpExpiryMs());
+  user.otpPurpose = 'vendor_verify_email';
+  user.otpVerifiedAt = undefined;
+  await user.save();
+
+  await sendVendorOtpEmail({ user });
+
+  return res.status(201).json({
+    success: true,
+    message: 'OTP sent to your email',
+    data: { email: user.email },
+  });
+});
+
+// @desc    Vendor Register - Page 2 (create/update Vendor profile)
+// @route   POST /api/v1/vendors/register/page2
+// @access  Public
+exports.vendorRegisterPage2 = asyncHandler(async (req, res) => {
+  const {
+    email,
+    businessName,
+    businessRegistrationNumber,
+    taxId,
+    bankAccountNumber,
+    bankName,
+    businessDescription,
+    serviceCategories,
+    coverageAreas,
+    nin,
+  } = req.body;
+
+  // passport photograph comes from frontend upload endpoint or will be sent as URL.
+  const passportPhotograph = req.body.passportPhotograph || req.body.passportPhoto || req.body.passportPhotoUrl;
+
+  // Ensure schema fields exist (legacy schema may not include them yet)
+  const normalizedNin = nin ? nin.toString() : undefined;
+
+
+  if (!email) {
+    res.status(400);
+    throw new Error('Email is required');
+  }
+  if (!businessName) {
+    res.status(400);
+    throw new Error('businessName is required');
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase(), role: 'VENDOR' });
+  if (!user) {
+    res.status(404);
+    throw new Error('Vendor account not found');
+  }
+
+  const normalizedServiceCategories = Array.isArray(serviceCategories) ? serviceCategories : [];
+  const normalizedCoverageAreas = Array.isArray(coverageAreas) ? coverageAreas : [];
+
+  let vendor = await Vendor.findOne({ user: user._id });
+  if (!vendor) {
+    vendor = await Vendor.create({
+      user: user._id,
+      businessName,
+      businessRegistrationNumber,
+      taxId,
+      bankAccountNumber,
+      bankCode: bankName, // legacy schema uses bankCode
+      businessDescription,
+      serviceCategories: normalizedServiceCategories,
+      coverageAreas: normalizedCoverageAreas,
+      responseTimeHours: 24,
+      nin,
+      passportPhotograph,
+    });
+  } else {
+    vendor.businessName = businessName;
+    vendor.businessRegistrationNumber = businessRegistrationNumber;
+    vendor.taxId = taxId;
+    vendor.bankAccountNumber = bankAccountNumber;
+    vendor.bankCode = bankName;
+    vendor.businessDescription = businessDescription;
+    vendor.serviceCategories = normalizedServiceCategories;
+    vendor.coverageAreas = normalizedCoverageAreas;
+    vendor.nin = nin;
+    vendor.passportPhotograph = passportPhotograph;
+    await vendor.save();
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'Vendor profile saved. Continue to OTP verification.',
+    data: { email: user.email },
+  });
+});
+
+// @desc    Vendor Register - Page 3 (send OTP again if needed)
+// @route   POST /api/v1/vendors/register/page3
+// @access  Public
+exports.vendorRegisterPage3 = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400);
+    throw new Error('Email is required');
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase(), role: 'VENDOR' });
+  if (!user) {
+    res.status(404);
+    throw new Error('Vendor account not found');
+  }
+
+  if (user.otpPurpose !== 'vendor_verify_email' || !user.otpCode || !user.otpExpiresAt) {
+    const otp = generateSixDigitOtp();
+    user.otpCode = otp;
+    user.otpExpiresAt = new Date(Date.now() + otpExpiryMs());
+    user.otpPurpose = 'vendor_verify_email';
+    user.otpVerifiedAt = undefined;
+    await user.save();
+  }
+
+  await sendVendorOtpEmail({ user });
+
+  return res.status(200).json({
+    success: true,
+    message: 'OTP sent to your email',
+  });
+});
+
+// @desc    Vendor Register - Verify OTP (confirm 6-digit OTP + issue JWT)
+// @route   POST /api/v1/vendors/register/verify-otp
+// @access  Public
+exports.vendorVerifyOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    res.status(400);
+    throw new Error('Email and OTP are required');
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase(), role: 'VENDOR' });
+  if (!user) {
+    res.status(404);
+    throw new Error('Vendor account not found');
+  }
+
+  if (user.otpPurpose !== 'vendor_verify_email') {
+    res.status(400);
+    throw new Error('Invalid OTP purpose');
+  }
+
+  if (!user.otpCode || !user.otpExpiresAt) {
+    res.status(400);
+    throw new Error('No OTP request found');
+  }
+
+  if (new Date() > user.otpExpiresAt) {
+    res.status(400);
+    throw new Error('OTP expired');
+  }
+
+  if (user.otpCode !== otp.toString()) {
+    res.status(400);
+    throw new Error('Invalid OTP');
+  }
+
+  user.isVerified = true;
+  user.otpVerifiedAt = new Date();
+  user.otpCode = undefined;
+  user.otpExpiresAt = undefined;
+  user.otpPurpose = undefined;
+  await user.save();
+
+  // Issue JWT now (frontend will redirect to dashboard)
+  const { generateToken } = require('../utils/generateToken');
+  const token = generateToken(user._id);
+
+  user.password = undefined;
+  return res.status(200).json({
+    success: true,
+    message: 'Vendor email verified successfully',
+    token,
+    data: user,
+  });
+});
 
 // @desc    Get all vendors
 // @route   GET /api/v1/vendors
@@ -70,7 +323,7 @@ exports.getVendor = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Create vendor profile
+// @desc    Create vendor profile (legacy)
 // @route   POST /api/v1/vendors
 // @access  Private
 exports.createVendor = asyncHandler(async (req, res) => {
@@ -85,6 +338,8 @@ exports.createVendor = asyncHandler(async (req, res) => {
     coverageAreas,
     responseTimeHours,
   } = req.body;
+
+
 
   // Normalize arrays for the immediate vendor signup flow.
   // (If frontend sends empty strings/null, keep Mongo validation happy.)
@@ -113,8 +368,8 @@ exports.createVendor = asyncHandler(async (req, res) => {
     bankAccountNumber,
     bankCode,
     businessDescription,
-    serviceCategories,
-    coverageAreas,
+    serviceCategories: normalizedServiceCategories,
+    coverageAreas: normalizedCoverageAreas,
     responseTimeHours,
   });
 

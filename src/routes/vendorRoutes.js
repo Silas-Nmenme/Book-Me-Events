@@ -19,7 +19,7 @@ router.get('/:id/services', getVendorServices);
 router.get('/:id/reviews', getVendorReviews);
 
 // Protected routes (Vendor only)
-router.post('/', protect, authorize('USER'), createVendor);
+router.post('/', protect, authorize('VENDOR'), createVendor);
 router.put('/:id', protect, updateVendor);
 router.delete('/:id', protect, deleteVendor);
 router.get('/:id/bookings', protect, getVendorBookings);

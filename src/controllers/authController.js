@@ -1,31 +1,35 @@
 const asyncHandler = require('express-async-handler');
+const jwt = require('jsonwebtoken');
+
 const User = require('../models/User');
 const { generateToken } = require('../utils/generateToken');
 const { sendEmail } = require('../utils/emailClient');
 const {
-  welcomeEmail,
   passwordResetRequestedEmail,
   passwordResetSuccessEmail,
   loginSuccessEmail,
 } = require('../utils/emailTemplates');
 
-const jwt = require('jsonwebtoken');
-const {
-  createEmailVerificationToken,
-  verifyEmailVerificationToken,
-} = require('../utils/emailVerification');
+// ===============================
+// Helpers: 6-digit OTP (DB-backed)
+// ===============================
+function generateSixDigitOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
+function otpExpiryMs() {
+  const minutes = Number(process.env.JWT_OTP_EXPIRE_MINUTES || 10);
+  return minutes * 60 * 1000;
+}
 
-
-
-// @desc    Register user
+// @desc    Register USER (OTP verification required)
 // @route   POST /api/v1/auth/register
 // @access  Public
 exports.register = asyncHandler(async (req, res) => {
-  const { firstName, lastName, email, phone, password, passwordConfirm, role } = req.body;
+  const { firstName, lastName, email, phone, password, passwordConfirm } = req.body;
 
   // Validation
-  if (!firstName || !lastName || !email || !password || !passwordConfirm) {
+  if (!firstName || !lastName || !email || !phone || !password || !passwordConfirm) {
     res.status(400);
     throw new Error('Please provide all required fields');
   }
@@ -42,58 +46,87 @@ exports.register = asyncHandler(async (req, res) => {
     throw new Error('Email already registered');
   }
 
-  // Create user
+  // Create user (role strictly USER)
   const user = await User.create({
     firstName,
     lastName,
     email: email.toLowerCase(),
     phone,
     password,
-    role: role || 'USER',
+    role: 'USER',
+    isVerified: false,
   });
 
-  // Remove password from response
-  user.password = undefined;
+  const otp = generateSixDigitOtp();
+  user.otpCode = otp;
+  user.otpExpiresAt = new Date(Date.now() + otpExpiryMs());
+  user.otpPurpose = 'user_verify_email';
+  user.otpVerifiedAt = undefined;
+  await user.save();
 
-  // Generate token
-  if (!process.env.JWT_SECRET) {
-    res.status(500);
-    throw new Error('Server misconfiguration: JWT_SECRET is missing');
-  }
-
-  let token;
+  // Send OTP email (best-effort)
   try {
-    token = generateToken(user._id);
-  } catch (err) {
-    res.status(500);
-    throw new Error(`Token generation failed: ${err.message}`);
-  }
-
-
-  // Send welcome email (best-effort: don't fail registration if email fails)
-  try {
-    const { subject, text, html } = welcomeEmail({ firstName: user.firstName, role: user.role });
-
-    await sendEmail({
-      to: user.email,
-      subject,
-      text,
-      html,
-    });
+    const subject = `Your ${process.env.APP_NAME || 'Book Me Events'} OTP verification code`;
+    const text = `Hi ${user.firstName},\n\nYour OTP code is: ${otp}\nThis code expires in ${Number(process.env.JWT_OTP_EXPIRE_MINUTES || 10)} minutes.\n`;
+    await sendEmail({ to: user.email, subject, text, html: `<p>${text.replace(/\n/g, '<br/>')}</p>` });
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error('Welcome email failed:', err.message);
+    console.error('OTP email failed:', err.message);
   }
 
+  // Do not issue JWT until OTP verification.
+  user.password = undefined;
   res.status(201).json({
     success: true,
+    message: 'OTP sent to your email',
     data: user,
-    token,
   });
 });
 
+// @desc    Verify USER email by OTP
+// @route   POST /api/v1/auth/verify-otp
+// @access  Public
+exports.verifyOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) {
+    res.status(400);
+    throw new Error('Email and OTP are required');
+  }
 
-// @desc    Login user
+  const user = await User.findOne({ email: email.toLowerCase() });
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  if (user.otpPurpose !== 'user_verify_email') {
+    res.status(400);
+    throw new Error('Invalid OTP purpose');
+  }
+  if (!user.otpCode || !user.otpExpiresAt) {
+    res.status(400);
+    throw new Error('No OTP request found');
+  }
+  if (new Date() > user.otpExpiresAt) {
+    res.status(400);
+    throw new Error('OTP expired');
+  }
+  if (user.otpCode !== otp.toString()) {
+    res.status(400);
+    throw new Error('Invalid OTP');
+  }
+
+  user.isVerified = true;
+  user.otpVerifiedAt = new Date();
+  user.otpCode = undefined;
+  user.otpExpiresAt = undefined;
+  user.otpPurpose = undefined;
+  await user.save();
+
+  res.status(200).json({ success: true, message: 'Email verified successfully' });
+});
+
+// @desc    Login user (requires OTP verified)
 // @route   POST /api/v1/auth/login
 // @access  Public
 exports.login = asyncHandler(async (req, res) => {
@@ -111,6 +144,12 @@ exports.login = asyncHandler(async (req, res) => {
     res.status(401);
     throw new Error('Invalid credentials');
   }
+
+  if (!user.isVerified) {
+    res.status(403);
+    throw new Error('Account not verified. Please verify your email OTP.');
+  }
+
 
   // Debug: helps diagnose Vercel 500s during login
   // (No sensitive data: only config state)
@@ -195,65 +234,9 @@ exports.getMe = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Verify email
-// @route   POST /api/v1/auth/verify-email
-// @access  Private
-exports.verifyEmail = asyncHandler(async (req, res) => {
-  const token =
-    (req.body && req.body.token) ||
-    (req.query && req.query.token) ||
-    undefined;
+// NOTE: old JWT-link email verification removed.
+// Email verification is now OTP-based (see verifyOtp).
 
-
-  if (!process.env.JWT_SECRET) {
-    res.status(500);
-    throw new Error('Server misconfiguration: JWT_SECRET is missing');
-  }
-
-  // Preferred: verify signed token from the email link.
-  if (token) {
-    let decoded;
-    try {
-      decoded = verifyEmailVerificationToken(token);
-    } catch (e) {
-
-      res.status(400);
-      throw new Error('Invalid or expired verification token');
-    }
-
-
-    await User.findByIdAndUpdate(
-      decoded.id,
-
-      { isVerified: true },
-      { new: true, runValidators: true }
-    );
-
-    if (!user) {
-      res.status(404);
-      throw new Error('User not found');
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Email verified successfully',
-      data: user,
-    });
-  }
-
-  // Fallback: old behavior (requires authentication).
-  const user = await User.findByIdAndUpdate(
-    req.user.id,
-    { isVerified: true },
-    { new: true, runValidators: true }
-  );
-
-  return res.status(200).json({
-    success: true,
-    message: 'Email verified successfully',
-    data: user,
-  });
-});
 
 
 // @desc    Forgot password

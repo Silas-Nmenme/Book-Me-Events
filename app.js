@@ -50,6 +50,8 @@ const safeRoute = (path, route) => {
 safeRoute('/api/v1/auth', require('./src/routes/authRoutes'));
 safeRoute('/api/v1/users', require('./src/routes/userRoutes'));
 safeRoute('/api/v1/vendors', require('./src/routes/vendorRoutes'));
+safeRoute('/api/v1/vendors', require('./src/routes/vendorRegisterRoutes'));
+
 safeRoute('/api/v1/services', require('./src/routes/serviceRoutes'));
 safeRoute('/api/v1/requests', require('./src/routes/requestRoutes'));
 safeRoute('/api/v1/bookings', require('./src/routes/bookingRoutes'));
@@ -57,6 +59,8 @@ safeRoute('/api/v1/payments', require('./src/routes/paymentRoutes'));
 safeRoute('/api/v1/reviews', require('./src/routes/reviewRoutes'));
 safeRoute('/api/v1/messages', require('./src/routes/messageRoutes'));
 safeRoute('/api/v1/admin', require('./src/routes/adminRoutes'));
+safeRoute('/api/v1/admin', require('./src/routes/adminRegisterRoutes'));
+
 safeRoute('/api/v1/uploads', require('./src/routes/uploadRoutes'));
 
 

@@ -14,9 +14,16 @@ const userSchema = new mongoose.Schema(
     profilePicture: { type: String },
     bio: { type: String },
     refreshToken: { type: String },
+
+    // OTP verification (numeric 6-digit, DB-backed)
+    otpCode: { type: String },
+    otpExpiresAt: { type: Date },
+    otpPurpose: { type: String },
+    otpVerifiedAt: { type: Date },
   },
   { timestamps: true }
 );
+
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
