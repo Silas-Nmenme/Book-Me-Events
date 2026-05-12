@@ -86,6 +86,18 @@ exports.createVendor = asyncHandler(async (req, res) => {
     responseTimeHours,
   } = req.body;
 
+  // Normalize arrays for the immediate vendor signup flow.
+  // (If frontend sends empty strings/null, keep Mongo validation happy.)
+  // NOTE: we intentionally create vendor immediately after signup.
+  // Keep arrays normalized but pass through frontend values directly.
+  const normalizedServiceCategories = Array.isArray(serviceCategories)
+    ? serviceCategories
+    : [];
+  const normalizedCoverageAreas = Array.isArray(coverageAreas)
+    ? coverageAreas
+    : [];
+
+
   // Check if vendor already exists for this user
   let vendor = await Vendor.findOne({ user: req.user.id });
   if (vendor) {

@@ -11,11 +11,13 @@ const {
   resetPassword,
 } = require('../controllers/authController');
 const { sendVerificationEmail } = require('../controllers/verifyEmailController');
-
+const { createVendor } = require('../controllers/vendorController');
 
 // Public routes
 router.post('/register', register);
+router.post('/register/vendor', protect, authorize('USER'), createVendor);
 router.post('/login', express.json(), login);
+
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 
