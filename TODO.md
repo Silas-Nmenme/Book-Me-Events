@@ -12,3 +12,17 @@
 - [ ] Frontend dashboard banner + CTA calling verify-email
 
 
+# TODO - Route parity (backend @routes vs frontend)
+
+- [x] Add missing frontend API functions for backend user endpoints in `Frontend/js/api.js`:
+  - [x] getUser(id) -> GET `/api/v1/users/:id`
+  - [x] updateUser(id, payload) -> PUT `/api/v1/users/:id`
+  - [x] deleteUser(id) -> DELETE `/api/v1/users/:id`
+  - [x] getUserBookings(id) -> GET `/api/v1/users/:id/bookings`
+  - [x] getUserRequests(id) -> GET `/api/v1/users/:id/requests`
+- [x] Search frontend for any usage of `/api/v1/users` to confirm nothing else is needed.
+- [ ] (Optional) Run `npm test` / `npm run lint` if available.
+
+
+
+
