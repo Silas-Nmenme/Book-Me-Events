@@ -67,7 +67,7 @@ exports.getService = asyncHandler(async (req, res) => {
 // @access  Private (Vendor only)
 exports.createService = asyncHandler(async (req, res) => {
   const Vendor = require('../models/Vendor');
-  
+
   const {
     serviceName,
     serviceCategory,
@@ -76,6 +76,28 @@ exports.createService = asyncHandler(async (req, res) => {
     priceCurrency,
     images,
   } = req.body;
+
+  // If multipart upload is used (field name: `images`), multer will place
+  // files on req.files as an array: [{ buffer, mimetype, ... }]
+  const uploadedFiles = Array.isArray(req.files) ? req.files : [];
+
+  // Upload received images to Cloudinary and convert them to URL strings.
+  // Frontend expects we store the Cloudinary `secure_url` in Service.images.
+  const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
+
+  // If files were uploaded, overwrite `images` with Cloudinary URLs.
+  let finalImages = images;
+  if (uploadedFiles.length) {
+    const urls = [];
+    for (const file of uploadedFiles) {
+      const result = await uploadToCloudinary({
+        file,
+        folder: 'service_images',
+      });
+      if (result?.secure_url) urls.push(result.secure_url);
+    }
+    finalImages = urls;
+  }
 
   // Check if user is a vendor
   const vendor = await Vendor.findOne({ user: req.user.id });
@@ -91,7 +113,7 @@ exports.createService = asyncHandler(async (req, res) => {
     description,
     basePrice,
     priceCurrency,
-    images,
+    images: finalImages,
   });
 
   res.status(201).json({
