@@ -106,6 +106,24 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     conversationId: conversationId || `${req.user.id}-${recipient}`,
   });
 
+  // Emit real-time event to both participants (if socket.io is attached)
+  const io = req.app?.get?.('io');
+  if (io) {
+    const payload = {
+      _id: message._id,
+      sender: req.user.id,
+      recipient,
+      booking,
+      subject,
+      messageContent,
+      attachments,
+      createdAt: message.createdAt,
+    };
+
+    io.to(`user:${req.user.id}`).emit('message:new', payload);
+    io.to(`user:${recipient}`).emit('message:new', payload);
+  }
+
   const populatedMessage = await message.populate([
     { path: 'sender', select: 'firstName lastName profilePicture' },
     { path: 'recipient', select: 'firstName lastName profilePicture' },
