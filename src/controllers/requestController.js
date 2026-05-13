@@ -72,7 +72,11 @@ exports.getRequest = asyncHandler(async (req, res) => {
 // @access  Private (User only)
 exports.createRequest = asyncHandler(async (req, res) => {
   const {
+    // from UI dropdown
+    serviceId,
+    // keep backwards compatibility with old UI
     service,
+
     eventDate,
     eventLocation,
     eventDescription,
@@ -81,12 +85,13 @@ exports.createRequest = asyncHandler(async (req, res) => {
     notes,
   } = req.body;
 
-  if (!service) {
+  const resolvedServiceId = serviceId || service;
+  if (!resolvedServiceId) {
     res.status(400);
     throw new Error('Service is required');
   }
 
-  const serviceExists = await Service.findById(service);
+  const serviceExists = await Service.findById(resolvedServiceId);
   if (!serviceExists) {
     res.status(400);
     throw new Error('Service not found');
@@ -97,6 +102,7 @@ exports.createRequest = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Service vendor not found');
   }
+
 
 
   // Convert/validate eventDate early for clearer 400s
@@ -225,6 +231,7 @@ exports.cancelRequest = asyncHandler(async (req, res) => {
 exports.updateRequest = asyncHandler(async (req, res) => {
   let request = await Request.findById(req.params.id);
 
+
   if (!request) {
     res.status(404);
     throw new Error('Request not found');
@@ -247,3 +254,29 @@ exports.updateRequest = asyncHandler(async (req, res) => {
     data: request,
   });
 });
+
+// @desc    Delete request (User only)
+// @route   DELETE /api/v1/requests/:id
+// @access  Private (User only)
+exports.deleteRequest = asyncHandler(async (req, res) => {
+  const request = await Request.findById(req.params.id);
+
+  if (!request) {
+    res.status(404);
+    throw new Error('Request not found');
+  }
+
+  // Check if user owns this request
+  if (request.user.toString() !== req.user.id && req.user.role !== 'ADMIN') {
+    res.status(403);
+    throw new Error('Not authorized to delete this request');
+  }
+
+  await Request.findByIdAndDelete(req.params.id);
+
+  res.status(200).json({
+    success: true,
+    message: 'Request deleted successfully',
+  });
+});
+
