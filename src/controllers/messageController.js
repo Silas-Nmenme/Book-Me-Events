@@ -107,6 +107,9 @@ exports.sendMessage = asyncHandler(async (req, res) => {
   });
 
   // Emit real-time event to both participants (if socket.io is attached)
+  // NOTE: If clients don't receive events, verify Socket.IO connection + room join.
+  // Server-side logs can help confirm delivery.
+
   const io = req.app?.get?.('io');
   if (io) {
     const payload = {

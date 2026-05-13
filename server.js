@@ -29,6 +29,7 @@ const startServer = async () => {
     app.set('io', io);
 
     io.on('connection', (socket) => {
+      console.log('[socket] client connected', socket.id);
       // Client should emit: socket.emit('join', { userId })
       socket.on('join', ({ userId } = {}) => {
         if (!userId) return;
