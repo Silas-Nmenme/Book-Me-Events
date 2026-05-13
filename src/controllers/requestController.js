@@ -156,7 +156,8 @@ exports.acceptRequest = asyncHandler(async (req, res) => {
   }
 
   // Check if user is the vendor
-  if (request.vendor.toString() !== req.user._id && req.user.role !== 'ADMIN') {
+  const myVendorId = req.user?.id || req.user?._id;
+  if (request.vendor.toString() !== myVendorId?.toString() && req.user.role !== 'ADMIN') {
     res.status(403);
     throw new Error('Not authorized to accept this request');
   }
@@ -183,7 +184,8 @@ exports.declineRequest = asyncHandler(async (req, res) => {
   }
 
   // Check if user is the vendor
-  if (request.vendor.toString() !== req.user._id && req.user.role !== 'ADMIN') {
+  const myVendorId = req.user?.id || req.user?._id;
+  if (request.vendor.toString() !== myVendorId?.toString() && req.user.role !== 'ADMIN') {
     res.status(403);
     throw new Error('Not authorized to decline this request');
   }
