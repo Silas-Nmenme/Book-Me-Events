@@ -155,11 +155,14 @@ exports.acceptRequest = asyncHandler(async (req, res) => {
     throw new Error('Request not found');
   }
 
-  // Check if user is the vendor
-  const myVendorId = req.user?.id || req.user?._id;
-  if (request.vendor.toString() !== myVendorId?.toString() && req.user.role !== 'ADMIN') {
-    res.status(403);
-    throw new Error('Not authorized to accept this request');
+  // req.user is a User, while request.vendor is a Vendor._id.
+  if (req.user.role !== 'ADMIN') {
+    const vendor = await Vendor.findOne({ user: req.user.id || req.user._id });
+    const myVendorId = vendor?._id;
+    if (!myVendorId || request.vendor.toString() !== myVendorId.toString()) {
+      res.status(403);
+      throw new Error('Not authorized to accept this request');
+    }
   }
 
   request.status = 'ACCEPTED';
@@ -183,11 +186,14 @@ exports.declineRequest = asyncHandler(async (req, res) => {
     throw new Error('Request not found');
   }
 
-  // Check if user is the vendor
-  const myVendorId = req.user?.id || req.user?._id;
-  if (request.vendor.toString() !== myVendorId?.toString() && req.user.role !== 'ADMIN') {
-    res.status(403);
-    throw new Error('Not authorized to decline this request');
+  // req.user is a User, while request.vendor is a Vendor._id.
+  if (req.user.role !== 'ADMIN') {
+    const vendor = await Vendor.findOne({ user: req.user.id || req.user._id });
+    const myVendorId = vendor?._id;
+    if (!myVendorId || request.vendor.toString() !== myVendorId.toString()) {
+      res.status(403);
+      throw new Error('Not authorized to decline this request');
+    }
   }
 
   request.status = 'DECLINED';
