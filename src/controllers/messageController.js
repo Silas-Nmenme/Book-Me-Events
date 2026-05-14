@@ -150,6 +150,8 @@ exports.sendMessageByRequestId = asyncHandler(async (req, res) => {
   const { requestId } = req.params;
   const { messageContent, attachments, subject, booking } = req.body;
 
+  const mongoose = require('mongoose');
+
   if (!messageContent) {
     res.status(400);
     throw new Error('Message content is required');
@@ -240,6 +242,8 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     conversationId,
   } = req.body;
 
+  const mongoose = require('mongoose');
+
   if (!messageContent) {
     res.status(400);
     throw new Error('Message content is required');
@@ -250,6 +254,16 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     throw new Error('Recipient is required');
   }
 
+  if (!mongoose.Types.ObjectId.isValid(recipient)) {
+    res.status(400);
+    throw new Error('Recipient must be a valid userId');
+  }
+
+  if (attachments && !Array.isArray(attachments)) {
+    res.status(400);
+    throw new Error('attachments must be an array');
+  }
+
   const message = await Message.create({
     sender: req.user.id,
     recipient,
@@ -257,15 +271,10 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     subject,
     messageContent,
     attachments,
-    request,
     conversationId: conversationId || `${req.user.id}-${recipient}`,
   });
 
-
   // Emit real-time event to both participants (if socket.io is attached)
-  // NOTE: If clients don't receive events, verify Socket.IO connection + room join.
-  // Server-side logs can help confirm delivery.
-
   const io = req.app?.get?.('io');
   if (io) {
     const payload = {
