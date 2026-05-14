@@ -40,7 +40,13 @@ const safeRoute = (path, route) => {
     app.use(path, route);
     console.log(`Loaded route: ${path}`);
   } catch (err) {
-    console.error(`Failed to load route ${path}:`, err.message);
+    console.error(`Failed to load route ${path}:`, err?.message);
+    if (err?.stack) console.error(err.stack);
+
+    // Fail fast for announcements so Vercel doesn't silently return 404.
+    if (path === '/api/v1/announcements') {
+      throw err;
+    }
   }
 };
 
