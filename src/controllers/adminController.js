@@ -321,14 +321,21 @@ exports.getPlatformStats = asyncHandler(async (req, res) => {
 exports.sendAnnouncement = asyncHandler(async (req, res) => {
   const { title, message, recipientType } = req.body;
 
+  if (!title || !message || !recipientType) {
+    res.status(400);
+    throw new Error('title, message, and recipientType are required');
+  }
+
+  const announcement = await Announcement.create({
+    title: title.toString().trim(),
+    message: message.toString().trim(),
+    recipientType: recipientType.toString().toUpperCase(),
+  });
+
   res.status(201).json({
     success: true,
     message: 'Announcement sent successfully',
-    data: {
-      title,
-      message,
-      recipientType,
-      sentAt: new Date(),
-    },
+    data: announcement,
   });
 });
+

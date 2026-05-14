@@ -14,6 +14,7 @@ const {
   sendAnnouncement,
 } = require('../controllers/adminController');
 
+
 // All admin routes require authentication and ADMIN role
 router.use(protect, authorize('ADMIN'));
 
