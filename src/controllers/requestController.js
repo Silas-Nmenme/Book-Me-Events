@@ -29,11 +29,12 @@ exports.getRequests = asyncHandler(async (req, res) => {
 
   const requests = await Request.find(filter)
     .populate('user', 'firstName lastName email phone')
-    .populate('vendor', 'businessName')
+    .populate('vendor', 'businessName user')
     .populate('service')
     .skip(skip)
     .limit(parseInt(limit))
     .sort({ createdAt: -1 });
+
 
   const total = await Request.countDocuments(filter);
 
