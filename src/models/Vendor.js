@@ -18,6 +18,10 @@ const vendorSchema = new mongoose.Schema(
     totalReviews: { type: Number, default: 0 },
     totalBookings: { type: Number, default: 0 },
     profileCompletionPercentage: { type: Number, default: 0 },
+
+    // Admin-verifiable KYC document (uploaded by vendor)
+    kycDocumentUrl: { type: String },
+    kycDocumentPublicId: { type: String },
   },
   { timestamps: true }
 );

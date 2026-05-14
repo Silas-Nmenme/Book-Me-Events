@@ -87,6 +87,7 @@ exports.getPendingVendors = asyncHandler(async (req, res) => {
     .limit(parseInt(limit))
     .sort({ createdAt: -1 });
 
+
   const total = await Vendor.countDocuments({ isVerified: false });
 
   res.status(200).json({

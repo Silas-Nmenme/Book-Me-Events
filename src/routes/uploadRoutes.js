@@ -5,8 +5,10 @@ const { uploadSingle } = require('../middlewares/uploadMiddleware');
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 const { protect } = require('../middlewares/authMiddleware');
 const User = require('../models/User');
+const Vendor = require('../models/Vendor');
 
 const router = express.Router();
+
 
 // Upload profile picture for authenticated user (ADMIN/USER/VENDOR).
 // Frontend should send: multipart/form-data with field name = `image`.
@@ -44,13 +46,25 @@ router.post(
 
 router.post(
   '/vendor-kyc',
-
+  protect,
   uploadSingle('image'),
   asyncHandler(async (req, res) => {
     const result = await uploadToCloudinary({
       file: req.file,
       folder: 'vendor_kyc',
     });
+
+    // Save KYC doc onto the vendor record so admin can view before approving.
+    // Ensure vendor profile exists.
+    const vendor = await Vendor.findOne({ user: req.user.id });
+    if (!vendor) {
+      res.status(403);
+      throw new Error('Vendor profile not found for this user');
+    }
+
+    vendor.kycDocumentUrl = result.secure_url;
+    vendor.kycDocumentPublicId = result.public_id;
+    await vendor.save();
 
     res.status(201).json({
       success: true,
@@ -61,6 +75,7 @@ router.post(
     });
   })
 );
+
 
 // Example generic uploads if you need more later.
 router.post(

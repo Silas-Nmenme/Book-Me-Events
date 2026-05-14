@@ -108,7 +108,14 @@ exports.createService = asyncHandler(async (req, res) => {
     );
   }
 
+  // Enforce vendor KYC/admin verification before service creation.
+  if (!vendor.isVerified) {
+    res.status(403);
+    throw new Error('Your vendor account is not verified by admin yet. Services are locked until verification.');
+  }
+
   const service = await Service.create({
+
     vendor: vendor._id,
     serviceName,
     serviceCategory,
@@ -145,6 +152,13 @@ exports.updateService = asyncHandler(async (req, res) => {
     throw new Error('Not authorized to update this service');
   }
 
+  // Enforce verification before allowing vendor updates to services.
+  if (req.user.role !== 'ADMIN' && !vendor?.isVerified) {
+    res.status(403);
+    throw new Error('Your vendor account is not verified by admin yet. Services are locked until verification.');
+  }
+
+
   service = await Service.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
@@ -176,6 +190,13 @@ exports.deleteService = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('Not authorized to delete this service');
   }
+
+  // Enforce verification before allowing vendor deletion of services.
+  if (req.user.role !== 'ADMIN' && !vendor?.isVerified) {
+    res.status(403);
+    throw new Error('Your vendor account is not verified by admin yet. Services are locked until verification.');
+  }
+
 
   await Service.findByIdAndDelete(req.params.id);
 
