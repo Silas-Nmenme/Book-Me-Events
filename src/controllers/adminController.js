@@ -4,6 +4,7 @@ const Vendor = require('../models/Vendor');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const Review = require('../models/Review');
+const Announcement = require('../models/Announcement');
 const { sendEmail } = require('../utils/emailClient');
 const {
   vendorVerificationSuccessEmail,
