@@ -321,21 +321,45 @@ exports.getPlatformStats = asyncHandler(async (req, res) => {
 exports.sendAnnouncement = asyncHandler(async (req, res) => {
   const { title, message, recipientType } = req.body;
 
-  if (!title || !message || !recipientType) {
+  // Allow the admin UI to send recipientType=ALL.
+  // Backend schema only supports USER/VENDOR, so we expand ALL into two announcements.
+  const normalizedTitle = title?.toString().trim();
+  const normalizedMessage = message?.toString().trim();
+  const normalizedRecipientType = recipientType?.toString().toUpperCase();
+
+  if (!normalizedTitle || !normalizedMessage || !normalizedRecipientType) {
     res.status(400);
     throw new Error('title, message, and recipientType are required');
   }
 
-  const announcement = await Announcement.create({
-    title: title.toString().trim(),
-    message: message.toString().trim(),
-    recipientType: recipientType.toString().toUpperCase(),
-  });
+  const recipientTargets =
+    normalizedRecipientType === 'ALL'
+      ? ['USER', 'VENDOR']
+      : [normalizedRecipientType];
+
+  // Validate against schema enum so we fail fast with a clear message.
+  const invalid = recipientTargets.find((t) => t !== 'USER' && t !== 'VENDOR');
+  if (invalid) {
+    res.status(400);
+    throw new Error('recipientType must be USER, VENDOR, or ALL');
+  }
+
+  const announcements = await Promise.all(
+    recipientTargets.map((target) =>
+      Announcement.create({
+        title: normalizedTitle,
+        message: normalizedMessage,
+        recipientType: target,
+      })
+    )
+  );
 
   res.status(201).json({
     success: true,
     message: 'Announcement sent successfully',
-    data: announcement,
+    data: announcements.length === 1 ? announcements[0] : announcements,
   });
 });
+
+
 
