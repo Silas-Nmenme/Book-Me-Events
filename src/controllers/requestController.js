@@ -54,7 +54,7 @@ exports.getRequests = asyncHandler(async (req, res) => {
 exports.getRequest = asyncHandler(async (req, res) => {
   const request = await Request.findById(req.params.id)
     .populate('user', 'firstName lastName email phone profilePicture')
-    .populate('vendor', 'businessName email phone')
+.populate('vendor', 'businessName email phone user')
     .populate('service');
 
   if (!request) {
