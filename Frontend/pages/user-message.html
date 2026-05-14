@@ -127,7 +127,8 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
     <script type="module">
-      import { fetchMe, logoutUser, clearToken, apiFetch, getUnreadCount, getConversation, sendMessage } from '../js/api.js';
+      import { fetchMe, logoutUser, clearToken, apiFetch, getUnreadCount, getRequestConversation, sendMessageByRequestId } from '../js/api.js';
+
       import { toast, setYear } from '../js/ui.js';
       import { initNavbarBrandRoleRedirect } from '../js/role-redirect.js';
       import { initThemeToggle } from '../js/theme-toggle.js';
@@ -325,14 +326,16 @@
         activeRequestLabel.textContent = `Request ${activeRequestMeta?._id || requestId}`;
         activeVendorLabel.textContent = `Vendor: ${activeRequestMeta?.vendor?.businessName || '—'}`;
 
-        await loadConversation(activePartnerUserId);
+        await loadRequestConversation(requestId);
+
       }
 
-      async function loadConversation(userId) {
+      async function loadRequestConversation(requestId) {
         messagesList.innerHTML = '';
-        if (!userId) return;
+        if (!requestId) return;
 
-        const res = await getConversation(userId, { page: 1, limit: 200 });
+        const res = await getRequestConversation(requestId, { page: 1, limit: 200 });
+
         const data = res?.data || res;
         const items = data?.data || data?.messages || data?.results || data || [];
 
@@ -364,12 +367,13 @@
         }
 
         try {
-          await sendMessage({ recipient: partner, messageContent: text, conversationId: `${meRes.me._id}-${partner}` });
+          await sendMessageByRequestId({ requestId: rid, messageContent: text });
           messageText.value = '';
-          await loadConversation(partner);
+          await loadRequestConversation(rid);
           await loadUnread();
           toast({ title: 'Sent', message: 'Message delivered.', variant: 'success' });
         } catch (e) {
+
           toast({ title: 'Send failed', message: e?.message || 'Try again.', variant: 'danger' });
         }
       });
@@ -403,8 +407,10 @@
             const recipientId = payload?.recipient?.toString?.() || payload?.recipient;
 
             const otherId = senderId === myId ? recipientId : senderId;
-            if (!otherId) return;
-            if (activePartnerUserId && otherId.toString() !== activePartnerUserId.toString()) return;
+            // request-based conversation: only append if message belongs to the active request.
+            const msgRequestId = payload?.request?.toString?.() || payload?.request;
+            if (activeRequestId && msgRequestId && msgRequestId.toString() !== activeRequestId.toString()) return;
+
 
             const el = renderMessage(payload, { meId: myId });
             messagesList.insertAdjacentHTML('beforeend', el);

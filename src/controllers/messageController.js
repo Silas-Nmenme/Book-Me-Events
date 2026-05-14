@@ -73,6 +73,160 @@ exports.getConversation = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get messages for a request conversation (user/vendor)
+// @route   GET /api/v1/messages/request/:requestId
+// @access  Private
+exports.getConversationByRequestId = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const { requestId } = req.params;
+
+  const skip = (page - 1) * limit;
+
+  // Only allow members of the request to access its messages.
+  // Request belongs to a USER (req.user.id) and a VENDOR (request.vendor). Vendor's owner is resolved below.
+  const Request = require('../models/Request');
+  const Vendor = require('../models/Vendor');
+
+  const request = await Request.findById(requestId).populate('user', '_id');
+  if (!request) {
+    res.status(404);
+    throw new Error('Request not found');
+  }
+
+  const userId = request.user._id.toString();
+
+  // Resolve vendor owner user id if needed.
+  let vendorUserId = '';
+  if (request.vendor) {
+    const vendor = await Vendor.findById(request.vendor).populate('user', '_id');
+    vendorUserId = vendor?.user?._id?.toString?.() || vendor?.user?.toString?.() || '';
+  }
+
+  const myId = req.user.id.toString();
+  const isParticipant = myId === userId || (vendorUserId && myId === vendorUserId);
+  if (!isParticipant) {
+    res.status(403);
+    throw new Error('Not authorized to view this request conversation');
+  }
+
+  const otherUserId = myId === userId ? vendorUserId : userId;
+
+  const messages = await Message.find({
+    $or: [
+      { sender: req.user.id, recipient: otherUserId },
+      { sender: otherUserId, recipient: req.user.id },
+    ],
+    request: requestId,
+  })
+    .populate('sender', 'firstName lastName profilePicture')
+    .populate('recipient', 'firstName lastName profilePicture')
+    .populate('booking')
+    .skip(skip)
+    .limit(parseInt(limit))
+    .sort({ createdAt: 1 });
+
+  // Mark as read for the current recipient.
+  await Message.updateMany(
+    {
+      recipient: req.user.id,
+      sender: otherUserId,
+      isRead: false,
+      request: requestId,
+    },
+    { isRead: true, readAt: new Date() }
+  );
+
+  res.status(200).json({
+    success: true,
+    count: messages.length,
+    data: messages,
+  });
+});
+
+// @desc    Send message tied to a request conversation
+// @route   POST /api/v1/messages/request/:requestId
+// @access  Private
+exports.sendMessageByRequestId = asyncHandler(async (req, res) => {
+  const { requestId } = req.params;
+  const { messageContent, attachments, subject, booking } = req.body;
+
+  if (!messageContent) {
+    res.status(400);
+    throw new Error('Message content is required');
+  }
+
+  const Request = require('../models/Request');
+  const Vendor = require('../models/Vendor');
+
+  const request = await Request.findById(requestId).populate('user', '_id');
+  if (!request) {
+    res.status(404);
+    throw new Error('Request not found');
+  }
+
+  const myId = req.user.id.toString();
+  const userId = request.user._id.toString();
+
+  let vendorUserId = '';
+  if (request.vendor) {
+    const vendor = await Vendor.findById(request.vendor).populate('user', '_id');
+    vendorUserId = vendor?.user?._id?.toString?.() || vendor?.user?.toString?.() || '';
+  }
+
+  const isParticipant = myId === userId || (vendorUserId && myId === vendorUserId);
+  if (!isParticipant) {
+    res.status(403);
+    throw new Error('Not authorized to send messages on this request');
+  }
+
+  const recipient = myId === userId ? vendorUserId : userId;
+
+  const message = await Message.create({
+    sender: req.user.id,
+    recipient,
+    request: requestId,
+    booking,
+    subject,
+    messageContent,
+    attachments,
+    conversationId: `${myId}-${recipient}`,
+  });
+
+  const io = req.app?.get?.('io');
+  if (io) {
+    const payload = {
+      _id: message._id,
+      sender: req.user.id,
+      recipient,
+      booking,
+      subject,
+      messageContent,
+      attachments,
+      createdAt: message.createdAt,
+      // Used by request-based chat UIs to filter real-time updates.
+      request: requestId,
+    };
+
+    io.to(`user:${req.user.id}`).emit('message:new', payload);
+    io.to(`user:${recipient}`).emit('message:new', payload);
+  }
+
+
+  const populatedMessage = await message.populate([
+    { path: 'sender', select: 'firstName lastName profilePicture' },
+    { path: 'recipient', select: 'firstName lastName profilePicture' },
+    { path: 'booking' },
+  ]);
+
+  res.status(201).json({
+    success: true,
+    message: 'Message sent successfully',
+    data: populatedMessage,
+  });
+});
+
+
+
 // @desc    Send message
 // @route   POST /api/v1/messages
 // @access  Private
@@ -103,8 +257,10 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     subject,
     messageContent,
     attachments,
+    request,
     conversationId: conversationId || `${req.user.id}-${recipient}`,
   });
+
 
   // Emit real-time event to both participants (if socket.io is attached)
   // NOTE: If clients don't receive events, verify Socket.IO connection + room join.

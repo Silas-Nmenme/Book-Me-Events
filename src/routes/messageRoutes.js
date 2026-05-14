@@ -4,12 +4,15 @@ const { protect } = require('../middlewares/authMiddleware');
 const {
   getMessages,
   getConversation,
+  getConversationByRequestId,
   sendMessage,
+  sendMessageByRequestId,
   getMessage,
   deleteMessage,
   getUnreadCount,
   markAsRead,
 } = require('../controllers/messageController');
+
 
 // Protected routes
 router.get('/', protect, getMessages);
@@ -20,8 +23,13 @@ router.get('/:id', protect, getMessage);
 // Send message
 router.post('/', protect, sendMessage);
 
+// Request-based conversation messaging
+router.get('/request/:requestId', protect, getConversationByRequestId);
+router.post('/request/:requestId', protect, sendMessageByRequestId);
+
 // Mark as read
 router.put('/:id/read', protect, markAsRead);
+
 
 // Delete message
 router.delete('/:id', protect, deleteMessage);
