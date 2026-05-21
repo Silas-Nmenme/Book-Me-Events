@@ -266,10 +266,16 @@ export async function initChatPage({ role = 'USER' } = {}) {
   }
 
   activeRequestLabel.textContent = `Request ${activeRequestId}`;
+  const partnerName = isVendor
+    ? escapeHtml(request?.user?.firstName || request?.user?.email || 'Organizer')
+    : escapeHtml(request?.vendor?.businessName || request?.vendor?.user?.email || 'Vendor');
   if (activePartnerLabel) {
     activePartnerLabel.textContent = isVendor
-      ? `Organizer: ${escapeHtml(request?.user?.firstName || request?.user?.email || 'Customer')}`
-      : `Vendor: ${escapeHtml(request?.vendor?.businessName || request?.vendor?.user?.email || 'Vendor')}`;
+      ? `Organizer: ${partnerName}`
+      : `Vendor: ${partnerName}`;
+  }
+  if (pageTitle) {
+    pageTitle.textContent = `Chat with ${partnerName}`;
   }
 
   if (conversationMeta) {
