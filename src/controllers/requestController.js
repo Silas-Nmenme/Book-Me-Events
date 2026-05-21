@@ -126,7 +126,7 @@ exports.createRequest = asyncHandler(async (req, res) => {
   const request = await Request.create({
     user: req.user.id,
     vendor,
-    service: service || undefined,
+    service: resolvedServiceId || undefined,
     eventDate: parsedEventDate,
     eventLocation,
     eventDescription,
@@ -135,6 +135,7 @@ exports.createRequest = asyncHandler(async (req, res) => {
     notes,
     responseDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
   });
+
 
 
   res.status(201).json({
