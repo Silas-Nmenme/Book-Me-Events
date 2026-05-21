@@ -22,7 +22,7 @@ function buildBaseHtml({ title, bodyHtml, ctaHref, ctaText, statusLabel }) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${safeTitle}</title>
 
-    <!-- Bootstrap CDN (requested). Some clients may ignore external CSS; we still keep inline styles for reliability. -->
+    <!-- Bootstrap CDN (best-effort). Most styling below is inline/safe. -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 
     <style>
@@ -31,29 +31,27 @@ function buildBaseHtml({ title, bodyHtml, ctaHref, ctaText, statusLabel }) {
         from { opacity: 0; transform: translateY(6px); }
         to { opacity: 1; transform: translateY(0); }
       }
-      @keyframes bbPulse {
+      @keyframes bbGlowPulse {
         0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(37,99,235,.0); }
-        50% { transform: scale(1.02); box-shadow: 0 12px 28px rgba(37,99,235,.18); }
+        50% { transform: scale(1.015); box-shadow: 0 14px 30px rgba(37,99,235,.25); }
       }
 
-      .bb-hero {
-        animation: bbFadeSlide 650ms ease-out both;
-      }
+      .bb-hero { animation: bbFadeSlide 650ms ease-out both; }
+
       .bb-cta {
         display: inline-block;
         text-decoration: none;
         background: #2563eb;
-        color: #ffffff;
+        color: #ffffff !important;
         padding: 12px 18px;
-        border-radius: 10px;
-        font-weight: 700;
+        border-radius: 12px;
+        font-weight: 800;
+        letter-spacing: .2px;
       }
-      .bb-cta:hover {
-        background: #1d4ed8;
-        animation: bbPulse 900ms ease-in-out both;
-      }
-      /* Fallback for clients that remove hover/animation */
-      .bb-cta { box-shadow: 0 10px 22px rgba(37,99,235,.15); }
+      .bb-cta:hover { background: #1d4ed8; animation: bbGlowPulse 900ms ease-in-out both; }
+
+      /* Fallback shadow for clients that remove hover/animation */
+      .bb-cta { box-shadow: 0 12px 26px rgba(37,99,235,.18); }
 
       @media (prefers-reduced-motion: reduce) {
         .bb-hero { animation: none !important; }
@@ -65,15 +63,16 @@ function buildBaseHtml({ title, bodyHtml, ctaHref, ctaText, statusLabel }) {
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f6f7fb;">
       <tr>
         <td align="center" style="padding:24px;">
-          <table role="presentation" width="100%" style="max-width:620px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #eef2ff;">
+          <table role="presentation" width="100%" style="max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #eef2ff;">
+
             <!-- Header -->
             <tr>
-              <td style="padding:22px 24px;background:linear-gradient(90deg,#0f172a,#2563eb);color:#ffffff;">
-                <div style="font-size:13px;opacity:.92;letter-spacing:.25px;text-transform:uppercase;">${escapeHtml(APP_NAME)}</div>
-                <div class="bb-hero" style="font-size:20px;font-weight:800;margin-top:6px;">${safeTitle}</div>
+              <td style="padding:26px 26px;background:linear-gradient(90deg,#0f172a,#2563eb);color:#ffffff;">
+                <div style="font-size:13px;opacity:.93;letter-spacing:.3px;text-transform:uppercase;">${escapeHtml(APP_NAME)}</div>
+                <div class="bb-hero" style="font-size:22px;line-height:1.2;font-weight:900;margin-top:8px;">${safeTitle}</div>
 
                 ${safeStatusLabel ? `
-                  <div style="margin-top:10px;display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;">
+                  <div style="margin-top:12px;display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);padding:7px 12px;border-radius:999px;font-size:12px;font-weight:900;">
                     ${safeStatusLabel}
                   </div>
                 ` : ''}
@@ -82,11 +81,11 @@ function buildBaseHtml({ title, bodyHtml, ctaHref, ctaText, statusLabel }) {
 
             <!-- Body -->
             <tr>
-              <td style="padding:22px 24px;color:#0f172a;">
+              <td style="padding:22px 26px;color:#0f172a;">
                 ${bodyHtml}
 
                 ${ctaHref && ctaText ? `
-                  <p style="margin:22px 0 10px;">
+                  <p style="margin:26px 0 10px;">
                     <a class="bb-cta" href="${safeCtaHref}" target="_blank" rel="noopener noreferrer">${safeCtaText}</a>
                   </p>
                   <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
@@ -94,15 +93,19 @@ function buildBaseHtml({ title, bodyHtml, ctaHref, ctaText, statusLabel }) {
                     <span style="word-break:break-all;">${safeCtaHref}</span>
                   </p>
                 ` : ''}
+
+                <div style="margin-top:18px;font-size:12px;color:#6b7280;line-height:1.7;">
+                  You’re receiving this email because of your account on <b>${escapeHtml(APP_NAME)}</b>.
+                </div>
               </td>
             </tr>
 
             <!-- Footer -->
             <tr>
-              <td style="padding:16px 24px;background:#f9fafb;color:#6b7280;font-size:12px;line-height:1.6;">
-                <div style="font-weight:600;color:#4b5563;">Need help?</div>
-                <div>Contact us anytime.</div>
-                <div style="margin-top:8px;">© ${new Date().getFullYear()} ${escapeHtml(APP_NAME)}. All rights reserved.</div>
+              <td style="padding:16px 26px;background:#f9fafb;color:#6b7280;font-size:12px;line-height:1.6;">
+                <div style="font-weight:900;color:#374151;margin-bottom:4px;">Need help?</div>
+                <div>Reply to this email anytime.</div>
+                <div style="margin-top:10px;color:#9ca3af;">© ${new Date().getFullYear()} ${escapeHtml(APP_NAME)}. All rights reserved.</div>
               </td>
             </tr>
 

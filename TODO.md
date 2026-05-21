@@ -1,6 +1,5 @@
-- [x] Locate where malformed request id `${encodeURIComponent(id)}` is being sent to backend.
-- [x] Add defensive validation for request ids in Frontend/js/pages/user-request.js (and any other page that calls /api/v1/requests/:id).
-- [x] If validation fails, prevent API call and show toast with helpful error.
-- [ ] Re-test chat/load flows that fetch request details.
+- [x] Rewrite `src/utils/emailTemplates.js` templates with fuller, detailed HTML + safer subtle animations.
+- [x] Ensure exported function names/parameters stay unchanged so controllers keep working.
+- [x] Run a quick Node require check for `src/utils/emailTemplates.js` to confirm syntax.
 
 

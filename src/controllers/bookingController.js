@@ -96,21 +96,24 @@ exports.createBooking = asyncHandler(async (req, res) => {
     throw new Error('Request must be accepted first');
   }
 
-  // Ensure vendor and service exist on the request to prevent server errors
+  // Ensure vendor exists
   if (!serviceRequest.vendor) {
     res.status(400);
     throw new Error('Request is missing a vendor; cannot create booking');
   }
-  if (!serviceRequest.service) {
+
+  // Use service from request if available; otherwise use service from payload
+  const finalService = serviceRequest.service?._id || serviceRequest.service || service;
+  if (!finalService) {
     res.status(400);
-    throw new Error('Request is missing a service; cannot create booking');
+    throw new Error('Request must have a service linked, or service must be provided in payload');
   }
 
   const booking = await Booking.create({
     request,
     user: req.user.id,
     vendor: serviceRequest.vendor._id || serviceRequest.vendor,
-    service,
+    service: finalService,
     eventDate,
     eventLocation,
     totalAmount,
