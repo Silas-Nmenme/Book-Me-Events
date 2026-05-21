@@ -59,6 +59,7 @@ function buildRequestCard(req) {
         </div>
 
         <div class="mt-3 d-flex flex-wrap gap-2">
+          <a class="btn btn-soft btn-sm" href="request-details.html?requestId=${encodeURIComponent(id)}">Details</a>
           <button
             class="btn btn-soft btn-sm"
             type="button"
