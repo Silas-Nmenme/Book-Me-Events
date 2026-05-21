@@ -1,6 +1,4 @@
 import {
-  apiFetch,
-  getMessages,
   getUnreadCount,
   sendMessage,
   getConversation,

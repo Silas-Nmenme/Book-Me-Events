@@ -3,8 +3,6 @@ require('dotenv').config();
 const http = require('http');
 const { Server } = require('socket.io');
 
-require('dotenv').config();
-
 const app = require('./app');
 const connectDB = require('./src/config/db');
 
