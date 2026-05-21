@@ -97,3 +97,16 @@ You can store `url` into `User.profilePicture`.
 **Created:** May 6, 2026
 **Status:** Ready for Development
 
+---
+
+## 💡 Why you'll love Book Me Events
+
+- **Built for speed:** Professional workflows for users, vendors, and admins.
+- **How it works:**
+	1. Tell us about your event through creating a request
+	2. Get service proposals from vendors who match your needs
+	3. Chat and finalize details between you and the vendor
+	4. Book, pay, and track progress through your dashboard
+
+This README now reflects the core user workflow surfaced in the frontend UI.
+

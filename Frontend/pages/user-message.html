@@ -72,6 +72,22 @@
                 <div class="small text-muted-soft" id="activeVendorLabel" style="margin-top:6px;">—</div>
               </div>
             </div>
+            <!-- Why you'll love (compact) -->
+            <div class="mt-4 card card-glass p-4 fade-slide">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="fw-bold">Why you'll love Book Me Events</div>
+                <span class="badge text-bg-secondary">Built for speed</span>
+              </div>
+
+              <div class="small text-muted-soft mb-2">Professional workflows for users, vendors, and admins.</div>
+
+              <ul class="list-unstyled mb-0">
+                <li class="mb-1"><span class="fw-bold">1.</span> Tell us about your event (create a request)</li>
+                <li class="mb-1"><span class="fw-bold">2.</span> Receive proposals from vendors</li>
+                <li class="mb-1"><span class="fw-bold">3.</span> Chat and finalize details</li>
+                <li class="mb-0"><span class="fw-bold">4.</span> Book, pay, and track progress</li>
+              </ul>
+            </div>
 
             <div class="mt-4 card card-glass p-4 fade-slide">
               <div class="fw-bold mb-2">Select conversation</div>
@@ -399,10 +415,10 @@
             const recipientId = payload?.recipient?.toString?.() || payload?.recipient;
 
             const otherId = senderId === myId ? recipientId : senderId;
-            // request-based conversation: only append if message belongs to the active request.
+            // request-based conversation: only append if message belongs to the currently active request.
+            const activeRequestKey = activeRequestId || activeRequestMeta?._id;
             const msgRequestId = payload?.request?.toString?.() || payload?.request;
-            if (activeRequestId && msgRequestId && msgRequestId.toString() !== activeRequestId.toString()) return;
-
+            if (!activeRequestKey || !msgRequestId || msgRequestId.toString() !== activeRequestKey.toString()) return;
 
             const el = renderMessage(payload, { meId: myId });
             messagesList.insertAdjacentHTML('beforeend', el);

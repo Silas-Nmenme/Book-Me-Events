@@ -119,7 +119,7 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
     <script type="module">
-      import { fetchMe, logoutUser, clearToken, apiFetch, getConversation, sendMessage } from '../js/api.js';
+      import { fetchMe, logoutUser, clearToken, apiFetch, getRequestConversation, sendMessageByRequestId } from '../js/api.js';
       import { toast, setYear } from '../js/ui.js';
       import { initNavbarBrandRoleRedirect } from '../js/role-redirect.js';
       import { initThemeToggle } from '../js/theme-toggle.js';
@@ -234,8 +234,8 @@
 
       async function loadConversation(userId) {
         messagesList.innerHTML = '';
-        if (!userId) return;
-        const res = await getConversation(userId, { page: 1, limit: 200 });
+        if (!requestId) return;
+        const res = await getRequestConversation(requestId, { page: 1, limit: 200 });
         const data = res?.data || res;
         const items = data?.data || data?.messages || data?.results || data || [];
         const arr = Array.isArray(items) ? items : [];
@@ -276,8 +276,8 @@
 
       btnSendMessage.addEventListener('click', async () => {
         const text = messageText.value.trim();
-        if (!activePartnerUserId) {
-          toast({ title: 'Missing organizer', message: 'Open a request first to chat.', variant: 'warning' });
+        if (!requestId) {
+          toast({ title: 'Missing request', message: 'Open a request first to chat.', variant: 'warning' });
           return;
         }
         if (!text) {
@@ -285,7 +285,7 @@
           return;
         }
         try {
-          await sendMessage({ recipient: activePartnerUserId, messageContent: text, conversationId: `${meRes.me._id}-${activePartnerUserId}` });
+          await sendMessageByRequestId({ requestId, messageContent: text });
           messageText.value = '';
           await loadConversation(activePartnerUserId);
           toast({ title: 'Sent', message: 'Message delivered.', variant: 'success' });
@@ -313,6 +313,8 @@
 
           socket.on('message:new', (payload) => {
             const myId = meRes.me?._id || meRes.me?.id;
+            if (requestId && payload?.request?.toString?.() !== requestId?.toString?.()) return;
+
             const senderId = payload?.sender?.toString?.() || payload?.sender;
             const recipientId = payload?.recipient?.toString?.() || payload?.recipient;
 
