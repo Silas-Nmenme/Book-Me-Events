@@ -126,7 +126,8 @@ export async function initVendorServicePage({ role } = {}) {
 
     try {
       // Vendor: backend already filters by vendor in getRequests when role is VENDOR.
-      const res = await apiFetch('/api/v1/requests?status=PENDING&page=1&limit=50', {
+      // Show the full request history so vendors can review pending and accepted work.
+      const res = await apiFetch('/api/v1/requests?page=1&limit=50', {
         method: 'GET',
       });
       const data = res?.data || res;

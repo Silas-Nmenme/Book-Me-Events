@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/authMiddleware');
+const { body } = require('express-validator');
+const validateRequest = require('../middlewares/validateRequest');
 const {
   getBookings,
   getBooking,
@@ -15,8 +17,22 @@ const {
 router.get('/', protect, getBookings);
 router.get('/:id', protect, getBooking);
 
-// Create booking
-router.post('/', protect, authorize('USER'), createBooking);
+// Create booking with input validation
+router.post(
+  '/',
+  protect,
+  authorize('USER'),
+  [
+    body('request').exists().withMessage('request is required').isMongoId().withMessage('request must be a valid id'),
+    body('service').optional().isMongoId().withMessage('service must be a valid id'),
+    body('eventDate').optional().isISO8601().withMessage('eventDate must be a valid date'),
+    body('eventLocation').exists().withMessage('eventLocation is required').isString(),
+    body('totalAmount').optional().isNumeric().withMessage('totalAmount must be a number'),
+    body('specialRequests').optional().isString(),
+  ],
+  validateRequest,
+  createBooking
+);
 
 // Update booking
 router.put('/:id', protect, updateBooking);

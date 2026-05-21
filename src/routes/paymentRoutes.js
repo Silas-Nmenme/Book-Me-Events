@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/authMiddleware');
+const { body } = require('express-validator');
+const validateRequest = require('../middlewares/validateRequest');
 const {
   getPayments,
   getPayment,
@@ -17,7 +19,19 @@ router.get('/stats/overview', protect, authorize('ADMIN'), getPaymentStats);
 router.get('/:id', protect, getPayment);
 
 // Create payment (User only)
-router.post('/', protect, authorize('USER'), createPayment);
+router.post(
+  '/',
+  protect,
+  authorize('USER'),
+  [
+    body('booking').exists().withMessage('booking is required').isMongoId().withMessage('booking must be a valid id'),
+    body('paymentMethod').exists().withMessage('paymentMethod is required').isIn(['CARD', 'OFFLINE', 'WALLET']).withMessage('invalid paymentMethod'),
+    body('transactionReference').exists().withMessage('transactionReference is required').isString(),
+    body('paymentGateway').optional().isString(),
+  ],
+  validateRequest,
+  createPayment
+);
 
 // Refund payment
 router.post('/:id/refund', protect, refundPayment);
