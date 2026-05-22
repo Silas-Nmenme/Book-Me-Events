@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Booking = require('../models/Booking');
 const Request = require('../models/Request');
+const Vendor = require('../models/Vendor');
 const Payment = require('../models/Payment');
 const { sendEmail } = require('../utils/emailClient');
 const { bookingCreatedEmail } = require('../utils/emailTemplates');
@@ -22,7 +23,8 @@ exports.getBookings = asyncHandler(async (req, res) => {
   if (req.user.role === 'USER') {
     filter.user = req.user.id;
   } else if (req.user.role === 'VENDOR') {
-    filter.vendor = req.user._id;
+    const vendor = await Vendor.findOne({ user: req.user.id });
+    if (vendor) filter.vendor = vendor._id;
   }
 
   const skip = (page - 1) * limit;
@@ -167,7 +169,9 @@ exports.updateBooking = asyncHandler(async (req, res) => {
   }
 
   // Check authorization
-  if (booking.user.toString() !== req.user.id && booking.vendor.toString() !== req.user._id && req.user.role !== 'ADMIN') {
+  const vendor = req.user.role === 'VENDOR' ? await Vendor.findOne({ user: req.user.id }) : null;
+  const vendorId = vendor?._id?.toString?.() || '';
+  if (booking.user.toString() !== req.user.id && booking.vendor.toString() !== vendorId && req.user.role !== 'ADMIN') {
     res.status(403);
     throw new Error('Not authorized to update this booking');
   }
@@ -198,7 +202,9 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
   }
 
   // Check authorization
-  if (booking.user.toString() !== req.user.id && booking.vendor.toString() !== req.user._id && req.user.role !== 'ADMIN') {
+  const vendor = req.user.role === 'VENDOR' ? await Vendor.findOne({ user: req.user.id }) : null;
+  const vendorId = vendor?._id?.toString?.() || '';
+  if (booking.user.toString() !== req.user.id && booking.vendor.toString() !== vendorId && req.user.role !== 'ADMIN') {
     res.status(403);
     throw new Error('Not authorized to cancel this booking');
   }
@@ -229,7 +235,9 @@ exports.completeBooking = asyncHandler(async (req, res) => {
   }
 
   // Check if vendor
-  if (booking.vendor.toString() !== req.user._id && req.user.role !== 'ADMIN') {
+  const vendor = req.user.role === 'VENDOR' ? await Vendor.findOne({ user: req.user.id }) : null;
+  const vendorId = vendor?._id?.toString?.() || '';
+  if (booking.vendor.toString() !== vendorId && req.user.role !== 'ADMIN') {
     res.status(403);
     throw new Error('Not authorized to complete this booking');
   }
@@ -256,7 +264,9 @@ exports.deleteBooking = asyncHandler(async (req, res) => {
   }
 
   // Check authorization
-  if (booking.user.toString() !== req.user.id && booking.vendor.toString() !== req.user._id && req.user.role !== 'ADMIN') {
+  const vendor = req.user.role === 'VENDOR' ? await Vendor.findOne({ user: req.user.id }) : null;
+  const vendorId = vendor?._id?.toString?.() || '';
+  if (booking.user.toString() !== req.user.id && booking.vendor.toString() !== vendorId && req.user.role !== 'ADMIN') {
     res.status(403);
     throw new Error('Not authorized to delete this booking');
   }
