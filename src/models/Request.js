@@ -13,9 +13,10 @@ const requestSchema = new mongoose.Schema(
     budgetCurrency: { type: String, default: 'NGN' },
     status: { 
       type: String, 
-      enum: ['PENDING', 'ACCEPTED', 'DECLINED', 'COMPLETED', 'CANCELLED'], 
+      enum: ['PENDING', 'ACCEPTED', 'BOOKED', 'DECLINED', 'COMPLETED', 'CANCELLED'], 
       default: 'PENDING' 
     },
+    booking: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
     notes: { type: String },
     responseDeadline: { type: Date },
   },

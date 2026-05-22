@@ -14,6 +14,8 @@ exports.getRequests = asyncHandler(async (req, res) => {
 
   if (status) {
     filter.status = status;
+  } else {
+    filter.status = { $ne: 'BOOKED' };
   }
 
   // Vendors see requests for their services, Users see their own requests

@@ -383,6 +383,90 @@ function bookingCreatedEmail({ firstName, vendorName, serviceName, bookingDate, 
   return { subject, text, html };
 }
 
+function paymentReceiptEmail({ firstName, bookingId, amount, currency, paymentMethod, transactionReference, bookingDate, serviceName, vendorName, bookingUrl }) {
+  const safeFirstName = escapeHtml(firstName || 'there');
+  const safeBookingId = escapeHtml(bookingId || '—');
+  const safeAmount = escapeHtml(amount != null ? `${currency || 'NGN'} ${Number(amount).toLocaleString()}` : '—');
+  const safePaymentMethod = escapeHtml(paymentMethod || 'CARD');
+  const safeTransactionReference = escapeHtml(transactionReference || '—');
+  const safeBookingDate = escapeHtml(bookingDate || 'TBD');
+  const safeServiceName = escapeHtml(serviceName || 'Service');
+  const safeVendorName = escapeHtml(vendorName || 'Vendor');
+  const safeBookingUrl = escapeHtml(bookingUrl || process.env.BOOKINGS_URL || '');
+
+  const subject = `Payment receipt for booking ${safeBookingId} - ${APP_NAME}`;
+  const text = `Hi ${safeFirstName},\n\nYour payment for booking ${safeBookingId} was successful.\nService: ${safeServiceName}\nVendor: ${safeVendorName}\nAmount: ${safeAmount}\nPayment method: ${safePaymentMethod}\nReference: ${safeTransactionReference}\nDate: ${safeBookingDate}\n`;
+
+  const html = buildBaseHtml({
+    title: 'Payment received',
+    statusLabel: 'Paid',
+    bodyHtml: `
+      <p style="margin:0 0 12px;font-size:14px;">Hi <b>${safeFirstName}</b>,</p>
+      <p style="margin:0 0 14px;color:#6b7280;font-size:13px;line-height:1.6;">
+        Your payment has been received successfully. Thank you for booking with <b>${escapeHtml(APP_NAME)}</b>.
+      </p>
+      <div style="background:#f3f4f6;border-radius:14px;padding:16px 14px;">
+        ${buildInfoRow({ label: 'Booking ID', value: safeBookingId })}
+        ${buildInfoRow({ label: 'Service', value: safeServiceName })}
+        ${buildInfoRow({ label: 'Vendor', value: safeVendorName })}
+        ${buildInfoRow({ label: 'Amount', value: safeAmount })}
+        ${buildInfoRow({ label: 'Payment method', value: safePaymentMethod })}
+        ${buildInfoRow({ label: 'Reference', value: safeTransactionReference })}
+        ${buildInfoRow({ label: 'Booking date', value: safeBookingDate })}
+      </div>
+      <p style="margin:14px 0 0;color:#6b7280;font-size:12px;line-height:1.6;">
+        You can view your booking with the button below.
+      </p>
+    `,
+    ctaText: 'View booking',
+    ctaHref: safeBookingUrl,
+  });
+
+  return { subject, text, html };
+}
+
+function vendorPaymentNotificationEmail({ vendorName, bookingId, amount, currency, paymentMethod, transactionReference, bookingDate, serviceName, customerName, bookingUrl }) {
+  const safeVendorName = escapeHtml(vendorName || 'Vendor');
+  const safeBookingId = escapeHtml(bookingId || '—');
+  const safeAmount = escapeHtml(amount != null ? `${currency || 'NGN'} ${Number(amount).toLocaleString()}` : '—');
+  const safePaymentMethod = escapeHtml(paymentMethod || 'CARD');
+  const safeTransactionReference = escapeHtml(transactionReference || '—');
+  const safeBookingDate = escapeHtml(bookingDate || 'TBD');
+  const safeServiceName = escapeHtml(serviceName || 'Service');
+  const safeCustomerName = escapeHtml(customerName || 'Customer');
+  const safeBookingUrl = escapeHtml(bookingUrl || process.env.BOOKINGS_URL || '');
+
+  const subject = `New payment received for booking ${safeBookingId} - ${APP_NAME}`;
+  const text = `Hi ${safeVendorName},\n\nA payment has been received for booking ${safeBookingId}.\nService: ${safeServiceName}\nCustomer: ${safeCustomerName}\nAmount: ${safeAmount}\nPayment method: ${safePaymentMethod}\nReference: ${safeTransactionReference}\nDate: ${safeBookingDate}\n`;
+
+  const html = buildBaseHtml({
+    title: 'Payment received',
+    statusLabel: 'New payment',
+    bodyHtml: `
+      <p style="margin:0 0 12px;font-size:14px;">Hi <b>${safeVendorName}</b>,</p>
+      <p style="margin:0 0 14px;color:#6b7280;font-size:13px;line-height:1.6;">
+        A payment has been successfully received for one of your bookings.
+      </p>
+      <div style="background:#f3f4f6;border-radius:14px;padding:16px 14px;">
+        ${buildInfoRow({ label: 'Booking ID', value: safeBookingId })}
+        ${buildInfoRow({ label: 'Service', value: safeServiceName })}
+        ${buildInfoRow({ label: 'Customer', value: safeCustomerName })}
+        ${buildInfoRow({ label: 'Amount', value: safeAmount })}
+        ${buildInfoRow({ label: 'Payment method', value: safePaymentMethod })}
+        ${buildInfoRow({ label: 'Reference', value: safeTransactionReference })}
+        ${buildInfoRow({ label: 'Booking date', value: safeBookingDate })}
+      </div>
+      <p style="margin:14px 0 0;color:#6b7280;font-size:12px;line-height:1.6;">
+        Open your dashboard to manage the booking.
+      </p>
+    `,
+    ctaText: 'View booking',
+    ctaHref: safeBookingUrl,
+  });
+
+  return { subject, text, html };
+}
+
 module.exports = {
   welcomeEmail,
   passwordResetRequestedEmail,
@@ -395,5 +479,6 @@ module.exports = {
   vendorVerificationRejectedEmail,
   adminNewVendorApprovalRequestEmail,
   bookingCreatedEmail,
+  paymentReceiptEmail,
+  vendorPaymentNotificationEmail,
 };
-

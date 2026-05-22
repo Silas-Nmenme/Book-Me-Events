@@ -122,6 +122,17 @@ exports.createBooking = asyncHandler(async (req, res) => {
     specialRequests,
   });
 
+  // Link booking back to request and mark as BOOKED
+  try {
+    serviceRequest.status = 'BOOKED';
+    serviceRequest.booking = booking._id;
+    await serviceRequest.save();
+  } catch (err) {
+    // Non-fatal: log and continue
+    // eslint-disable-next-line no-console
+    console.error('Failed to update request with booking:', err.message);
+  }
+
   // Send booking created email (best-effort)
   try {
     const bookingUser = await require('../models/User').findById(req.user.id);

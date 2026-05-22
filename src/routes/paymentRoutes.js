@@ -10,9 +10,11 @@ const {
   getPaymentByRef,
   refundPayment,
   getPaymentStats,
+  createFlutterwavePayment,
 } = require('../controllers/paymentController');
 
 // Protected routes
+router.get('/', protect, getPayments);
 router.get('/ref/:ref', protect, getPaymentByRef);
 router.get('/stats/overview', protect, authorize('ADMIN'), getPaymentStats);
 
@@ -36,5 +38,7 @@ router.post(
 // Refund payment
 router.post('/:id/refund', protect, refundPayment);
 
+// Create Flutterwave Payment Link
+router.post('/initialize', protect, authorize('USER'), createFlutterwavePayment);
 
 module.exports = router;
