@@ -369,7 +369,21 @@ exports.createFlutterwavePayment = async (req, res) => {
       },
     };
 
-    const response = await flw.Payment.initiate(payload);
+    if (!process.env.FLW_PUBLIC_KEY || !process.env.FLW_SECRET_KEY) {
+      console.error('Flutterwave keys missing: FLW_PUBLIC_KEY or FLW_SECRET_KEY');
+      return res.status(500).json({ success: false, message: 'Payment provider not configured' });
+    }
+
+    // Support multiple SDK shapes: try to locate an initiate/initialize function safely
+    const paymentService = flw?.Payment || flw?.Payments || flw;
+    const initiateFn = paymentService?.initiate || paymentService?.initialize || paymentService?.create || paymentService?.initializePayment;
+
+    if (!initiateFn || typeof initiateFn !== 'function') {
+      console.error('Flutterwave SDK initialization function not found', Object.keys(paymentService || {}));
+      return res.status(500).json({ success: false, message: 'Payment provider SDK not available' });
+    }
+
+    const response = await initiateFn.call(paymentService, payload);
 
     if (response.status === 'success') {
       return res.status(200).json({
