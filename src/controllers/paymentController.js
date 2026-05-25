@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
 const { sendEmail } = require('../utils/emailClient');
@@ -11,6 +12,27 @@ const flw = new Flutterwave(
   process.env.FLW_PUBLIC_KEY,
   process.env.FLW_SECRET_KEY
 );
+
+const verifyFlutterwaveSignature = (rawBody, signature, secret) => {
+  if (!signature || !secret || !rawBody) {
+    return false;
+  }
+
+  const headerSig = Array.isArray(signature) ? signature[0] : signature;
+  const computedSig = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody, 'utf8')
+    .digest('hex');
+
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(computedSig, 'utf8'),
+      Buffer.from(headerSig, 'utf8')
+    );
+  } catch {
+    return false;
+  }
+};
 
 const FLUTTERWAVE_API_URL = 'https://api.flutterwave.com/v3/payments';
 
@@ -451,6 +473,7 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
   try {
     const webhookSecret = process.env.FLW_WEBHOOK_SECRET;
     const signature =
+      req.headers['verif-hash'] ||
       req.headers['verificationhash'] ||
       req.headers['verificationsignature'] ||
       req.headers['x-flutterwave-signature'] ||
@@ -465,11 +488,23 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Missing webhook signature' });
     }
 
-    let payload = req.body;
-    if (Buffer.isBuffer(payload)) {
-      payload = JSON.parse(payload.toString('utf8'));
-    } else if (typeof payload === 'string' && payload.length) {
-      payload = JSON.parse(payload);
+    let rawBody = req.body;
+    let payload = rawBody;
+    let rawText = '';
+
+    if (Buffer.isBuffer(rawBody)) {
+      rawText = rawBody.toString('utf8');
+      payload = JSON.parse(rawText);
+    } else if (typeof rawBody === 'string' && rawBody.length) {
+      rawText = rawBody;
+      payload = JSON.parse(rawText);
+    } else if (typeof rawBody === 'object' && rawBody !== null) {
+      rawText = JSON.stringify(rawBody);
+    }
+
+    if (!verifyFlutterwaveSignature(rawText, signature, webhookSecret)) {
+      console.error('Invalid Flutterwave webhook signature', { signature, rawTextLength: rawText.length });
+      return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
     }
 
     const event = payload?.event;
@@ -477,23 +512,6 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
 
     if (event !== 'charge.completed' || data?.status !== 'successful') {
       return res.json({ received: true, ignored: true });
-    }
-
-    try {
-      const verifier = flw?.Verifier || flw?.verifyWebhook || flw?.webhookVerifier;
-      if (typeof verifier === 'function') {
-        const ok = await verifier(payload, signature, webhookSecret);
-        if (!ok) {
-          return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
-        }
-      } else {
-        if (signature !== webhookSecret) {
-          return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
-        }
-      }
-    } catch (verifyErr) {
-      console.error('Webhook signature verification failed:', verifyErr?.message || verifyErr);
-      return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
     }
 
     const reference = data?.tx_ref || data?.reference;
@@ -508,6 +526,17 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
     }
 
     if (payment.paymentStatus === 'COMPLETED') {
+      const booking = await Booking.findById(payment.booking)
+        .populate('user')
+        .populate('vendor')
+        .populate('service');
+
+      if (booking && booking.paymentStatus !== 'COMPLETED') {
+        booking.paymentStatus = 'COMPLETED';
+        booking.bookingStatus = booking.bookingStatus === 'PENDING' ? 'CONFIRMED' : booking.bookingStatus;
+        await booking.save();
+      }
+
       return res.json({ received: true, duplicated: true });
     }
 

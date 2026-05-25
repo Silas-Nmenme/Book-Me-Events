@@ -15,7 +15,8 @@ const app = express();
 try {
   const flutterwaveWebhookHandler = require('./src/routes/paymentWebhook');
   app.post('/api/payment/webhook/flutterwave', express.raw({ type: 'application/json' }), flutterwaveWebhookHandler);
-  console.log('Loaded raw webhook route: /api/payment/webhook/flutterwave');
+  app.post('/api/v1/payments/webhook/flutterwave', express.raw({ type: 'application/json' }), flutterwaveWebhookHandler);
+  console.log('Loaded raw webhook routes: /api/payment/webhook/flutterwave and /api/v1/payments/webhook/flutterwave');
 } catch (err) {
   console.error('Failed to mount Flutterwave webhook route:', err?.message || err);
 }
