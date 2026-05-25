@@ -378,12 +378,43 @@ exports.createFlutterwavePayment = async (req, res) => {
     const paymentService = flw?.Payment || flw?.Payments || flw;
     const initiateFn = paymentService?.initiate || paymentService?.initialize || paymentService?.create || paymentService?.initializePayment;
 
-    if (!initiateFn || typeof initiateFn !== 'function') {
-      console.error('Flutterwave SDK initialization function not found', Object.keys(paymentService || {}));
-      return res.status(500).json({ success: false, message: 'Payment provider SDK not available' });
-    }
+    let response;
 
-    const response = await initiateFn.call(paymentService, payload);
+    if (!initiateFn || typeof initiateFn !== 'function') {
+      console.warn('Flutterwave SDK initialization function not found, falling back to direct HTTP call', Object.keys(paymentService || {}));
+
+      // Fallback: call Flutterwave API directly using server secret key
+      const secret = process.env.FLW_SECRET_KEY;
+      if (!secret) {
+        console.error('FLW_SECRET_KEY missing for fallback HTTP call');
+        return res.status(500).json({ success: false, message: 'Payment provider SDK not available' });
+      }
+
+      try {
+        const fwRes = await fetch('https://api.flutterwave.com/v3/payments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${secret}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const fwData = await fwRes.json().catch(() => null);
+
+        if (!fwRes.ok) {
+          console.error('Flutterwave HTTP init failed', fwRes.status, fwData);
+          return res.status(500).json({ success: false, message: fwData?.message || 'Failed to initialize payment' });
+        }
+
+        response = fwData;
+      } catch (e) {
+        console.error('Flutterwave HTTP init error:', e?.message || e);
+        return res.status(500).json({ success: false, message: 'Failed to initialize payment' });
+      }
+    } else {
+      response = await initiateFn.call(paymentService, payload);
+    }
 
     if (response.status === 'success') {
       return res.status(200).json({
@@ -410,101 +441,158 @@ exports.createFlutterwavePayment = async (req, res) => {
  */
 exports.flutterwaveWebhook = async (req, res) => {
   try {
-    const secretHash = process.env.FLW_WEBHOOK_SECRET;
-    const signature = req.headers['verificationhash'];
+    // Flutterwave signs the request using FLW_WEBHOOK_SECRET.
+    // Header name can vary; we defensively check multiple common headers.
+    const webhookSecret = process.env.FLW_WEBHOOK_SECRET;
+    const signature =
+      req.headers['verificationhash'] ||
+      req.headers['verificationsignature'] ||
+      req.headers['x-flutterwave-signature'] ||
+      req.headers['x-verification-hash'];
 
-    if (signature !== secretHash) {
+    if (!webhookSecret) {
+      console.error('FLW_WEBHOOK_SECRET missing; cannot verify Flutterwave webhook.');
+      return res.status(500).json({ success: false, message: 'Webhook secret not configured' });
+    }
+
+    // Idempotency: avoid duplicate payment creation if webhook is replayed.
+    const payload = req.body;
+    const event = payload?.event;
+    const data = payload?.data;
+
+    if (event !== 'charge.completed') {
+      return res.json({ received: true, ignored: true });
+    }
+
+    if (data?.status !== 'successful') {
+      return res.json({ received: true, ignored: true });
+    }
+
+    // Verify signature.
+    // NOTE: Flutterwave signature format/algorithm is not the same as simple equality.
+    // flutterwave-node-v3 provides utilities, but to keep this robust we do minimal verification:
+    // - If header is missing, reject.
+    // - If SDK verification is available, use it.
+    if (!signature) {
+      return res.status(401).json({ success: false, message: 'Missing webhook signature' });
+    }
+
+    // Best-effort verification (SDK-based when available), otherwise strict fallback.
+    // If flutterwave-node-v3 exposes a verifier, prefer it; else keep strict equality fallback.
+    try {
+      const verifier = flw?.Verifier || flw?.verifyWebhook || flw?.webhookVerifier;
+      if (typeof verifier === 'function') {
+        const ok = await verifier(payload, signature, webhookSecret);
+        if (!ok) {
+          return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
+        }
+      } else {
+        // Fallback: Some setups send the computed signature directly.
+        // Keep backward compatibility with your previous logic while requiring header presence.
+        if (signature !== webhookSecret) {
+          return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
+        }
+      }
+    } catch (verifyErr) {
+      console.error('Webhook signature verification failed:', verifyErr?.message || verifyErr);
       return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
     }
 
-    const payload = req.body;
+    const reference = data?.tx_ref;
+    const amount = data?.amount_settled;
+    const bookingId = data?.meta?.bookingId;
+    const paymentMethod = data?.payment_type || 'CARD';
 
-    if (payload.event === 'charge.completed' && payload.data.status === 'successful') {
-      const reference = payload.data.tx_ref;
-      const amount = payload.data.amount_settled;
-      const bookingId = payload.data.meta?.bookingId;
-      const paymentMethod = payload.data.payment_type || 'CARD';
-
-      try {
-        const booking = await Booking.findById(bookingId)
-          .populate('user')
-          .populate('vendor')
-          .populate('service');
-
-        if (booking) {
-          const payment = await Payment.create({
-            booking: booking._id,
-            user: booking.user,
-            vendor: booking.vendor,
-            amount,
-            paymentMethod,
-            transactionReference: reference,
-            paymentGateway: 'FLUTTERWAVE',
-            paymentStatus: 'COMPLETED',
-          });
-
-          booking.paymentStatus = 'COMPLETED';
-          booking.bookingStatus = booking.bookingStatus === 'PENDING' ? 'CONFIRMED' : booking.bookingStatus;
-          await booking.save();
-
-          try {
-            const receiptEmail = paymentReceiptEmail({
-              firstName: booking.user?.firstName || booking.user?.email,
-              bookingId: booking._id,
-              amount,
-              currency: booking.amountCurrency || 'NGN',
-              paymentMethod,
-              transactionReference: reference,
-              bookingDate: booking.eventDate?.toDateString?.() || booking.eventDate,
-              serviceName: booking.service?.name || booking.service?.serviceName || 'Service',
-              vendorName: booking.vendor?.businessName || booking.vendor?.name || 'Vendor',
-              bookingUrl: `${process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
-            });
-            if (booking.user?.email) {
-              await sendEmail({
-                to: booking.user.email,
-                subject: receiptEmail.subject,
-                text: receiptEmail.text,
-                html: receiptEmail.html,
-              });
-            }
-          } catch (e) {
-            console.error('Payment receipt email failed:', e.message);
-          }
-
-          try {
-            const vendorNotification = vendorPaymentNotificationEmail({
-              vendorName: booking.vendor?.businessName || booking.vendor?.name || 'Vendor',
-              bookingId: booking._id,
-              amount,
-              currency: booking.amountCurrency || 'NGN',
-              paymentMethod,
-              transactionReference: reference,
-              bookingDate: booking.eventDate?.toDateString?.() || booking.eventDate,
-              serviceName: booking.service?.name || booking.service?.serviceName || 'Service',
-              customerName: `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim() || booking.user?.email || 'Customer',
-              bookingUrl: `${process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
-            });
-            if (booking.vendor?.email) {
-              await sendEmail({
-                to: booking.vendor.email,
-                subject: vendorNotification.subject,
-                text: vendorNotification.text,
-                html: vendorNotification.html,
-              });
-            }
-          } catch (e) {
-            console.error('Vendor notification email failed:', e.message);
-          }
-        }
-      } catch (e) {
-        console.error('Webhook processing failed:', e.message);
-      }
+    if (!reference || !bookingId) {
+      return res.status(400).json({ success: false, message: 'Invalid webhook payload' });
     }
 
-    res.json({ received: true });
+    // Prevent duplicate payment records.
+    const existingPayment = await Payment.findOne({ transactionReference: reference });
+    if (existingPayment) {
+      return res.json({ received: true, duplicated: true });
+    }
+
+    const booking = await Booking.findById(bookingId)
+      .populate('user')
+      .populate('vendor')
+      .populate('service');
+
+    if (!booking) {
+      return res.status(404).json({ success: false, message: 'Booking not found' });
+    }
+
+    const payment = await Payment.create({
+      booking: booking._id,
+      user: booking.user,
+      vendor: booking.vendor,
+      amount,
+      currency: booking.amountCurrency || 'NGN',
+      paymentMethod,
+      transactionReference: reference,
+      paymentGateway: 'FLUTTERWAVE',
+      paymentStatus: 'COMPLETED',
+    });
+
+    // Update booking state.
+    booking.paymentStatus = 'COMPLETED';
+    booking.bookingStatus = booking.bookingStatus === 'PENDING' ? 'CONFIRMED' : booking.bookingStatus;
+    await booking.save();
+
+    // Notifications are best-effort to avoid breaking webhook if email fails.
+    try {
+      const receiptEmail = paymentReceiptEmail({
+        firstName: booking.user?.firstName || booking.user?.email,
+        bookingId: booking._id,
+        amount,
+        currency: booking.amountCurrency || 'NGN',
+        paymentMethod,
+        transactionReference: reference,
+        bookingDate: booking.eventDate?.toDateString?.() || booking.eventDate,
+        serviceName: booking.service?.name || booking.service?.serviceName || 'Service',
+        vendorName: booking.vendor?.businessName || booking.vendor?.name || 'Vendor',
+        bookingUrl: `${process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
+      });
+      if (booking.user?.email) {
+        await sendEmail({
+          to: booking.user.email,
+          subject: receiptEmail.subject,
+          text: receiptEmail.text,
+          html: receiptEmail.html,
+        });
+      }
+    } catch (e) {
+      console.error('Payment receipt email failed:', e.message);
+    }
+
+    try {
+      const vendorNotification = vendorPaymentNotificationEmail({
+        vendorName: booking.vendor?.businessName || booking.vendor?.name || 'Vendor',
+        bookingId: booking._id,
+        amount,
+        currency: booking.amountCurrency || 'NGN',
+        paymentMethod,
+        transactionReference: reference,
+        bookingDate: booking.eventDate?.toDateString?.() || booking.eventDate,
+        serviceName: booking.service?.name || booking.service?.serviceName || 'Service',
+        customerName: `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim() || booking.user?.email || 'Customer',
+        bookingUrl: `${process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
+      });
+      if (booking.vendor?.email) {
+        await sendEmail({
+          to: booking.vendor.email,
+          subject: vendorNotification.subject,
+          text: vendorNotification.text,
+          html: vendorNotification.html,
+        });
+      }
+    } catch (e) {
+      console.error('Vendor notification email failed:', e.message);
+    }
+
+    return res.json({ received: true });
   } catch (err) {
     console.error('Webhook error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
