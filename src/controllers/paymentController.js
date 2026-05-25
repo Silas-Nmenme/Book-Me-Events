@@ -337,7 +337,8 @@ exports.createFlutterwavePayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
-    if (booking.user.toString() !== req.user.id) {
+    const bookingUserId = booking.user?._id ? booking.user._id.toString() : booking.user?.toString();
+    if (bookingUserId !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
