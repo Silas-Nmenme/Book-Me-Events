@@ -1,3 +1,3 @@
-const { flutterwaveWebhook } = require('../controllers/paymentController');
+const { handleFlutterwaveWebhook } = require('../controllers/paymentController');
 
-module.exports = (req, res) => flutterwaveWebhook(req, res);
+module.exports = (req, res) => handleFlutterwaveWebhook(req, res);

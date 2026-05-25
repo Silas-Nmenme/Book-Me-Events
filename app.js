@@ -14,7 +14,7 @@ const app = express();
 // Flutterwave webhook endpoint. Mount it before the JSON body parser.
 try {
   const flutterwaveWebhookHandler = require('./src/routes/paymentWebhook');
-  app.post('/api/payment/webhook/flutterwave', express.json(), flutterwaveWebhookHandler);
+  app.post('/api/payment/webhook/flutterwave', express.raw({ type: 'application/json' }), flutterwaveWebhookHandler);
   console.log('Loaded raw webhook route: /api/payment/webhook/flutterwave');
 } catch (err) {
   console.error('Failed to mount Flutterwave webhook route:', err?.message || err);
