@@ -374,47 +374,18 @@ exports.createFlutterwavePayment = async (req, res) => {
       return res.status(500).json({ success: false, message: 'Payment provider not configured' });
     }
 
-    // Support multiple SDK shapes: try to locate an initiate/initialize function safely
+    // Use only the Flutterwave SDK to initialize the payment link.
+    // If the SDK doesn't expose a valid initializer, fail loudly (no HTTP fallback).
     const paymentService = flw?.Payment || flw?.Payments || flw;
     const initiateFn = paymentService?.initiate || paymentService?.initialize || paymentService?.create || paymentService?.initializePayment;
 
-    let response;
-
     if (!initiateFn || typeof initiateFn !== 'function') {
-      console.warn('Flutterwave SDK initialization function not found, falling back to direct HTTP call', Object.keys(paymentService || {}));
-
-      // Fallback: call Flutterwave API directly using server secret key
-      const secret = process.env.FLW_SECRET_KEY;
-      if (!secret) {
-        console.error('FLW_SECRET_KEY missing for fallback HTTP call');
-        return res.status(500).json({ success: false, message: 'Payment provider SDK not available' });
-      }
-
-      try {
-        const fwRes = await fetch('https://api.flutterwave.com/v3/payments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${secret}`,
-          },
-          body: JSON.stringify(payload),
-        });
-
-        const fwData = await fwRes.json().catch(() => null);
-
-        if (!fwRes.ok) {
-          console.error('Flutterwave HTTP init failed', fwRes.status, fwData);
-          return res.status(500).json({ success: false, message: fwData?.message || 'Failed to initialize payment' });
-        }
-
-        response = fwData;
-      } catch (e) {
-        console.error('Flutterwave HTTP init error:', e?.message || e);
-        return res.status(500).json({ success: false, message: 'Failed to initialize payment' });
-      }
-    } else {
-      response = await initiateFn.call(paymentService, payload);
+      console.error('Flutterwave SDK initialization function not found. Please verify flutterwave-node-v3 version and usage.');
+      return res.status(500).json({ success: false, message: 'Payment provider SDK not configured' });
     }
+
+    const response = await initiateFn.call(paymentService, payload);
+
 
     if (response.status === 'success') {
       return res.status(200).json({
