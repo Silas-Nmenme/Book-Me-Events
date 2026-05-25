@@ -12,6 +12,37 @@ const flw = new Flutterwave(
   process.env.FLW_SECRET_KEY
 );
 
+const FLUTTERWAVE_API_URL = 'https://api.flutterwave.com/v3/payments';
+
+const initiateFlutterwavePaymentRequest = async (payload) => {
+  const secretKey = process.env.FLW_SECRET_KEY;
+  if (!secretKey) {
+    throw new Error('FLW_SECRET_KEY is not configured');
+  }
+
+  const fetchClient = typeof fetch === 'function' ? fetch : globalThis?.fetch;
+  if (!fetchClient) {
+    throw new Error('Fetch API not available on this server environment. Use Node 18+ or install a fetch polyfill.');
+  }
+
+  const response = await fetchClient(FLUTTERWAVE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${secretKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok || data?.status !== 'success') {
+    const message = data?.message || data?.status || 'Failed to initialize Flutterwave payment';
+    throw new Error(message);
+  }
+
+  return data;
+};
+
 /**
  * GET ALL PAYMENTS
  */
@@ -146,7 +177,7 @@ exports.createPayment = async (req, res) => {
         bookingDate: bookingData.eventDate?.toDateString?.() || bookingData.eventDate,
         serviceName: bookingData.service?.name || bookingData.service?.serviceName || 'Service',
         vendorName: bookingData.vendor?.businessName || bookingData.vendor?.name || 'Vendor',
-        bookingUrl: `${process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${bookingData._id}`,
+        bookingUrl: `${process.env.FRONTEND_URL || process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${bookingData._id}`,
       });
       await sendEmail({
         to: bookingData.user.email,
@@ -169,7 +200,7 @@ exports.createPayment = async (req, res) => {
         bookingDate: bookingData.eventDate?.toDateString?.() || bookingData.eventDate,
         serviceName: bookingData.service?.name || bookingData.service?.serviceName || 'Service',
         customerName: `${bookingData.user?.firstName || ''} ${bookingData.user?.lastName || ''}`.trim() || bookingData.user?.email || 'Customer',
-        bookingUrl: `${process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${bookingData._id}`,
+        bookingUrl: `${process.env.FRONTEND_URL || process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${bookingData._id}`,
       });
       await sendEmail({
         to: bookingData.vendor.email,
@@ -346,13 +377,36 @@ exports.createFlutterwavePayment = async (req, res) => {
     const currency = booking.amountCurrency || 'NGN';
     const userEmail = booking.user.email || 'noemail@example.com';
     const userName = `${booking.user.firstName || ''} ${booking.user.lastName || ''}`.trim() || booking.user.email;
+    const frontendUrl = process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://bookmeevent.netlify.app';
+
+    if (!process.env.FLW_SECRET_KEY) {
+      console.error('Flutterwave secret key missing: FLW_SECRET_KEY');
+      return res.status(500).json({ success: false, message: 'Payment provider not configured' });
+    }
+
+    const tx_ref = `BOOK_${booking._id}_${Date.now()}`;
+    const redirectUrl = `${frontendUrl}/pages/bookings.html?bookingId=${booking._id}`;
+
+    const payment = await Payment.create({
+      booking: booking._id,
+      user: req.user.id,
+      vendor: booking.vendor._id,
+      amount,
+      currency,
+      paymentMethod: 'CARD',
+      transactionReference: tx_ref,
+      paymentGateway: 'FLUTTERWAVE',
+      paymentStatus: 'PENDING',
+    });
+
+    await Booking.findByIdAndUpdate(bookingId, { paymentStatus: 'PENDING' });
 
     const payload = {
-      tx_ref: `BOOK_${booking._id}_${Date.now()}`,
+      tx_ref,
       amount,
       currency,
       payment_options: 'card, mobilemoney, ussd',
-      redirect_url: `${process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
+      redirect_url: redirectUrl,
       meta: {
         bookingId: booking._id.toString(),
         userId: req.user.id,
@@ -360,6 +414,7 @@ exports.createFlutterwavePayment = async (req, res) => {
       },
       customer: {
         email: userEmail,
+        phonenumber: booking.user.phone || booking.user.phoneNumber || '',
         name: userName,
       },
       customizations: {
@@ -369,41 +424,20 @@ exports.createFlutterwavePayment = async (req, res) => {
       },
     };
 
-    if (!process.env.FLW_PUBLIC_KEY || !process.env.FLW_SECRET_KEY) {
-      console.error('Flutterwave keys missing: FLW_PUBLIC_KEY or FLW_SECRET_KEY');
-      return res.status(500).json({ success: false, message: 'Payment provider not configured' });
-    }
+    const response = await initiateFlutterwavePaymentRequest(payload);
 
-    // Use only the Flutterwave SDK to initialize the payment link.
-    // If the SDK doesn't expose a valid initializer, fail loudly (no HTTP fallback).
-    const paymentService = flw?.Payment || flw?.Payments || flw;
-    const initiateFn = paymentService?.initiate || paymentService?.initialize || paymentService?.create || paymentService?.initializePayment;
-
-    if (!initiateFn || typeof initiateFn !== 'function') {
-      console.error('Flutterwave SDK initialization function not found. Please verify flutterwave-node-v3 version and usage.');
-      return res.status(500).json({ success: false, message: 'Payment provider SDK not configured' });
-    }
-
-    const response = await initiateFn.call(paymentService, payload);
-
-
-    if (response.status === 'success') {
-      return res.status(200).json({
-        success: true,
-        link: response.data.link,
-        authorization_url: response.data.authorization_url,
-        access_code: response.data.access_code,
-        reference: response.data.reference,
-      });
-    }
-
-    return res.status(400).json({
-      success: false,
-      message: response.message || 'Failed to initialize payment',
+    return res.status(200).json({
+      success: true,
+      link: response.data.link,
+      authorization_url: response.data.authorization_url,
+      access_code: response.data.access_code,
+      reference: response.data.reference,
+      tx_ref,
+      paymentId: payment._id,
     });
   } catch (err) {
-    console.error('Flutterwave payment error:', err);
-    return res.status(500).json({ success: false, message: err.message });
+    console.error('Flutterwave payment error:', err?.message || err);
+    return res.status(500).json({ success: false, message: err?.message || 'Internal server error' });
   }
 };
 
@@ -470,18 +504,12 @@ exports.flutterwaveWebhook = async (req, res) => {
     }
 
     const reference = data?.tx_ref;
-    const amount = data?.amount_settled;
+    const amount = data?.amount_settled || data?.amount;
     const bookingId = data?.meta?.bookingId;
-    const paymentMethod = data?.payment_type || 'CARD';
+    const paymentMethod = data?.payment_type || data?.payment_method || 'CARD';
 
     if (!reference || !bookingId) {
       return res.status(400).json({ success: false, message: 'Invalid webhook payload' });
-    }
-
-    // Prevent duplicate payment records.
-    const existingPayment = await Payment.findOne({ transactionReference: reference });
-    if (existingPayment) {
-      return res.json({ received: true, duplicated: true });
     }
 
     const booking = await Booking.findById(bookingId)
@@ -493,17 +521,36 @@ exports.flutterwaveWebhook = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Booking not found' });
     }
 
-    const payment = await Payment.create({
-      booking: booking._id,
-      user: booking.user,
-      vendor: booking.vendor,
-      amount,
-      currency: booking.amountCurrency || 'NGN',
-      paymentMethod,
-      transactionReference: reference,
-      paymentGateway: 'FLUTTERWAVE',
-      paymentStatus: 'COMPLETED',
-    });
+    let payment = await Payment.findOne({ transactionReference: reference });
+    if (!payment) {
+      payment = await Payment.findOne({ booking: booking._id, paymentStatus: 'PENDING', paymentGateway: 'FLUTTERWAVE' });
+    }
+
+    if (!payment) {
+      console.warn('Pending payment record not found for webhook, creating fallback record', { reference, bookingId });
+      payment = await Payment.create({
+        booking: booking._id,
+        user: booking.user,
+        vendor: booking.vendor,
+        amount: amount || booking.totalAmount || 0,
+        currency: booking.amountCurrency || 'NGN',
+        paymentMethod,
+        transactionReference: reference,
+        paymentGateway: 'FLUTTERWAVE',
+        paymentStatus: 'COMPLETED',
+      });
+    } else {
+      if (payment.paymentStatus === 'COMPLETED') {
+        return res.json({ received: true, duplicated: true });
+      }
+
+      payment.paymentStatus = 'COMPLETED';
+      payment.paymentMethod = paymentMethod;
+      payment.paymentGateway = 'FLUTTERWAVE';
+      payment.amount = amount || payment.amount;
+      payment.currency = booking.amountCurrency || payment.currency || 'NGN';
+      await payment.save();
+    }
 
     // Update booking state.
     booking.paymentStatus = 'COMPLETED';
@@ -522,7 +569,7 @@ exports.flutterwaveWebhook = async (req, res) => {
         bookingDate: booking.eventDate?.toDateString?.() || booking.eventDate,
         serviceName: booking.service?.name || booking.service?.serviceName || 'Service',
         vendorName: booking.vendor?.businessName || booking.vendor?.name || 'Vendor',
-        bookingUrl: `${process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
+        bookingUrl: `${process.env.FRONTEND_URL || process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
       });
       if (booking.user?.email) {
         await sendEmail({
@@ -547,7 +594,7 @@ exports.flutterwaveWebhook = async (req, res) => {
         bookingDate: booking.eventDate?.toDateString?.() || booking.eventDate,
         serviceName: booking.service?.name || booking.service?.serviceName || 'Service',
         customerName: `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim() || booking.user?.email || 'Customer',
-        bookingUrl: `${process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
+        bookingUrl: `${process.env.FRONTEND_URL || process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
       });
       if (booking.vendor?.email) {
         await sendEmail({
