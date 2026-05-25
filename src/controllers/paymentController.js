@@ -6,12 +6,6 @@ const {
   paymentReceiptEmail,
   vendorPaymentNotificationEmail,
 } = require('../utils/emailTemplates');
-const Flutterwave = require('flutterwave-node-v3');
-
-const flw = new Flutterwave(
-  process.env.FLW_PUBLIC_KEY,
-  process.env.FLW_SECRET_KEY
-);
 
 const verifyFlutterwaveSignature = (rawBody, signature, secret) => {
   if (!signature || !secret || !rawBody) {
@@ -510,18 +504,36 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
     const event = payload?.event;
     const data = payload?.data;
 
-    if (event !== 'charge.completed' || data?.status !== 'successful') {
+    console.log('Flutterwave webhook received', {
+      url: req.originalUrl,
+      event,
+      status: data?.status,
+      reference: data?.tx_ref || data?.reference,
+      meta: data?.meta,
+    });
+
+    const allowedStatus = ['successful', 'success', 'completed'];
+    if (event !== 'charge.completed' || !allowedStatus.includes((data?.status || '').toString().toLowerCase())) {
       return res.json({ received: true, ignored: true });
     }
 
     const reference = data?.tx_ref || data?.reference;
-    if (!reference) {
-      return res.status(400).json({ success: false, message: 'Invalid webhook payload' });
+    let payment = null;
+
+    if (reference) {
+      payment = await Payment.findOne({ transactionReference: reference });
     }
 
-    const payment = await Payment.findOne({ transactionReference: reference });
+    if (!payment && data?.meta?.bookingId) {
+      payment = await Payment.findOne({ booking: data.meta.bookingId, paymentGateway: 'FLUTTERWAVE' });
+    }
+
     if (!payment) {
-      console.warn('Payment not found for Flutterwave webhook reference:', reference);
+      console.warn('Payment not found for Flutterwave webhook:', {
+        reference,
+        bookingId: data?.meta?.bookingId,
+        payloadEvent: event,
+      });
       return res.status(404).json({ success: false, message: 'Payment record not found' });
     }
 
