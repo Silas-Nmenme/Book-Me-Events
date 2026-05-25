@@ -384,20 +384,23 @@ exports.createFlutterwavePayment = async (req, res) => {
       return res.status(500).json({ success: false, message: 'Payment provider not configured' });
     }
 
-    const tx_ref = `BOOK_${booking._id}_${Date.now()}`;
     const redirectUrl = `${frontendUrl}/pages/bookings.html?bookingId=${booking._id}`;
+    let payment = await Payment.findOne({ booking: booking._id, paymentStatus: 'PENDING', paymentGateway: 'FLUTTERWAVE' });
+    const tx_ref = payment?.transactionReference || `BOOK_${booking._id}_${Date.now()}`;
 
-    const payment = await Payment.create({
-      booking: booking._id,
-      user: req.user.id,
-      vendor: booking.vendor._id,
-      amount,
-      currency,
-      paymentMethod: 'CARD',
-      transactionReference: tx_ref,
-      paymentGateway: 'FLUTTERWAVE',
-      paymentStatus: 'PENDING',
-    });
+    if (!payment) {
+      payment = await Payment.create({
+        booking: booking._id,
+        user: req.user.id,
+        vendor: booking.vendor._id,
+        amount,
+        currency,
+        paymentMethod: 'CARD',
+        transactionReference: tx_ref,
+        paymentGateway: 'FLUTTERWAVE',
+        paymentStatus: 'PENDING',
+      });
+    }
 
     await Booking.findByIdAndUpdate(bookingId, { paymentStatus: 'PENDING' });
 
