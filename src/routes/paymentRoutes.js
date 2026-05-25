@@ -11,6 +11,7 @@ const {
   refundPayment,
   getPaymentStats,
   createFlutterwavePayment,
+  handleFlutterwaveWebhook,
 } = require('../controllers/paymentController');
 
 // Protected routes
@@ -40,5 +41,15 @@ router.post('/:id/refund', protect, refundPayment);
 
 // Create Flutterwave Payment Link
 router.post('/initialize', protect, authorize('USER'), createFlutterwavePayment);
+
+// Webhook 
+
+// Flutterwave webhook for backend payment confirmation
+router.post(
+  '/webhook/flutterwave',
+  express.raw({ type: 'application/json' }), // Required for Flutterwave signature validation
+  handleFlutterwaveWebhook
+);
+
 
 module.exports = router;
