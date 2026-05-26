@@ -106,18 +106,19 @@ html{ scroll-padding-top: var(--bme-navbar-height); }
 }
 
 /* Prevent closed collapse from intercepting pointer events */
-.bme-navbar .navbar-collapse{ pointer-events: none; }
-.bme-navbar .navbar-collapse.show{ pointer-events: auto; }
+.bme-navbar .navbar-collapse { pointer-events: none; }
+.bme-navbar .navbar-collapse.show { pointer-events: auto; }
 
-
+/* Don’t force layout behaviors that can break desktop interactions.
+   Let Bootstrap handle collapse/show, and only animate height/opacity on small screens. */
 .bme-navbar .navbar-collapse {
-  display: flex !important;
+  display: block !important;
   flex-direction: column;
   width: 100%;
   max-height: 0;
   overflow: hidden;
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-6px);
   transition: max-height .32s ease, opacity .25s ease, transform .25s ease;
 }
 
@@ -126,6 +127,7 @@ html{ scroll-padding-top: var(--bme-navbar-height); }
   opacity: 1;
   transform: translateY(0);
 }
+
 
 .bme-navbar .navbar-toggler {
   display: inline-flex !important;
