@@ -22,46 +22,64 @@
           </span>
         </a>
 
-        <div class="ms-auto d-flex gap-2 align-items-center">
-          <!-- Quick links -->
-          <a class="btn btn-soft" href="services.html" aria-label="Browse services">Services</a>
-          <a class="btn btn-soft" href="#howItWorks" aria-label="How it works">How it works</a>
-          <a class="btn btn-soft" href="#serviceCategories" aria-label="What we offer">What we offer</a>
-          <a class="btn btn-soft" href="#trusted" aria-label="Trusted and secure">Trusted</a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navContent"
+          aria-controls="navContent"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
 
-          <!-- Account actions (kept as a dropdown) -->
-          <div class="dropdown">
+        <div id="navContent" class="collapse navbar-collapse">
+          <div class="ms-auto d-flex gap-2 align-items-center flex-wrap justify-content-end">
+            <!-- Quick links -->
+            <div class="d-flex gap-2 flex-wrap justify-content-end">
+              <a class="btn btn-soft" href="services.html" aria-label="Browse services">Services</a>
+              <a class="btn btn-soft" href="#howItWorks" aria-label="How it works">How it works</a>
+              <a class="btn btn-soft" href="#serviceCategories" aria-label="What we offer">What we offer</a>
+              <a class="btn btn-soft" href="#trusted" aria-label="Trusted and secure">Trusted</a>
+            </div>
+
+            <!-- Account actions (kept as a dropdown) -->
+            <div class="dropdown">
+              <button
+                class="btn btn-soft dropdown-toggle"
+                type="button"
+                id="authDropdown"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                aria-label="Account actions"
+              >
+                <span class="badge text-bg-secondary">Account</span>
+              </button>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="authDropdown">
+                <li><a class="dropdown-item" href="auth-login.html">Login</a></li>
+                <li><a class="dropdown-item" href="auth-register.html">User sign up</a></li>
+                <li><a class="dropdown-item" href="vendor-register-page1.html">Vendor sign up</a></li>
+              </ul>
+            </div>
+
+            <!-- Theme toggle -->
             <button
-              class="btn btn-soft dropdown-toggle"
+              id="themeToggleBtn"
+              class="btn btn-soft btn-sm bme-theme-toggle"
               type="button"
-              id="authDropdown"
-              data-bs-toggle="dropdown"
-              aria-expanded="false"
-              aria-label="Account actions"
+              aria-label="Toggle dark/light theme"
+              title="Toggle theme"
             >
-              <span class="badge text-bg-secondary">Account</span>
+              <span data-icon="sun" style="display:none;">☀️</span>
+              <span data-icon="moon" style="display:inline-flex;">🌙</span>
             </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="authDropdown">
-              <li><a class="dropdown-item" href="auth-login.html">Login</a></li>
-              <li><a class="dropdown-item" href="auth-register.html">User sign up</a></li>
-              <li><a class="dropdown-item" href="vendor-register-page1.html">Vendor sign up</a></li>
-            </ul>
           </div>
-
-          <!-- Theme toggle -->
-          <button
-            id="themeToggleBtn"
-            class="btn btn-soft btn-sm bme-theme-toggle"
-            type="button"
-            aria-label="Toggle dark/light theme"
-            title="Toggle theme"
-          >
-            <span data-icon="sun" style="display:none;">☀️</span>
-            <span data-icon="moon" style="display:inline-flex;">🌙</span>
-          </button>
         </div>
+
       </div>
     </nav>
+
 
 
 
