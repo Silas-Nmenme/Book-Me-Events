@@ -83,8 +83,8 @@
 
 
 
-    <header class="position-relative overflow-hidden">
-      <div class="container section position-relative" style="padding-top: 0 !important;">
+    <header class="position-relative overflow-hidden" id="top">
+      <div class="container section position-relative bme-landing-hero" style="padding-top: 0 !important; padding-bottom: 24px;">
         <div class="row align-items-center g-4">
           <div class="col-lg-7">
             <div>
@@ -316,9 +316,18 @@
       import { setYear } from '../js/ui.js';
       import { initThemeToggle } from '../js/theme-toggle.js';
       import { initLandingHeaderDetailsToggle } from '../js/pages/landing-header-toggle.js';
+
+      // Bootstrap dark/light toggle + landing header details toggle
       setYear('year');
       initThemeToggle();
       initLandingHeaderDetailsToggle();
+
+      // Ensure navbar collapse doesn't leave an overlay intercepting clicks on desktop.
+      // (Some CSS rules rely on the collapse being removed from the layout.)
+      try {
+        const navContent = document.getElementById('navContent');
+        if (navContent) navContent.classList.remove('show');
+      } catch {}
     </script>
 
   </body>
