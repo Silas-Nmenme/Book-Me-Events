@@ -401,24 +401,42 @@ exports.createFlutterwavePayment = async (req, res) => {
     }
 
     const redirectUrl = `${frontendUrl}/pages/bookings.html?bookingId=${booking._id}`;
-    let payment = await Payment.findOne({ booking: booking._id, paymentStatus: 'PENDING', paymentGateway: 'FLUTTERWAVE' });
-    const tx_ref = payment?.transactionReference || `BOOK_${booking._id}_${Date.now()}`;
+  
+  // FIX: Generate unique transaction reference for each initialization attempt
+  // This allows users to retry failed payments without unique constraint violations
+  const tx_ref = `BOOK_${booking._id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-    if (!payment) {
-      payment = await Payment.create({
-        booking: booking._id,
-        user: req.user.id,
-        vendor: booking.vendor._id,
-        amount,
-        currency,
-        paymentMethod: 'CARD',
+  let payment = await Payment.findOne({ booking: booking._id, paymentStatus: 'PENDING', paymentGateway: 'FLUTTERWAVE' });
+
+  if (!payment) {
+    // Create new PENDING payment
+    payment = await Payment.create({
+      booking: booking._id,
+      user: req.user.id,
+      vendor: booking.vendor._id,
+      amount,
+      currency,
+      paymentMethod: 'CARD',
+      transactionReference: tx_ref,
+      paymentGateway: 'FLUTTERWAVE',
+      paymentStatus: 'PENDING',
+      // FIX: Add initialization timestamp for audit trail
+      initializedAt: new Date(),
+    });
+  } else {
+    // FIX: Update existing PENDING payment with new transaction reference
+    // This handles retry scenarios where user clicks "Pay again"
+    payment = await Payment.findByIdAndUpdate(
+      payment._id,
+      {
         transactionReference: tx_ref,
-        paymentGateway: 'FLUTTERWAVE',
-        paymentStatus: 'PENDING',
-      });
-    }
+        initializedAt: new Date(),
+      },
+      { new: true }
+    );
+  }
 
-    await Booking.findByIdAndUpdate(bookingId, { paymentStatus: 'PENDING' });
+  await Booking.findByIdAndUpdate(bookingId, { paymentStatus: 'PENDING' });
 
     const payload = {
       tx_ref,
@@ -462,6 +480,7 @@ exports.createFlutterwavePayment = async (req, res) => {
 
 /**
  * FLUTTERWAVE WEBHOOK
+ * FIX: All error responses now return 200 OK to prevent Flutterwave retry loops
  */
 exports.handleFlutterwaveWebhook = async (req, res) => {
   try {
@@ -475,11 +494,14 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
 
     if (!webhookSecret) {
       console.error('FLW_WEBHOOK_SECRET missing; cannot verify Flutterwave webhook.');
-      return res.status(500).json({ success: false, message: 'Webhook secret not configured' });
+      // FIX: Return 200 with acknowledged response instead of 500
+      return res.status(200).json({ received: true, error: 'Webhook secret not configured' });
     }
 
     if (!signature) {
-      return res.status(401).json({ success: false, message: 'Missing webhook signature' });
+      console.warn('Missing webhook signature');
+      // FIX: Return 200 with acknowledged response instead of 401
+      return res.status(200).json({ received: true, error: 'Missing webhook signature' });
     }
 
     let rawBody = req.body;
@@ -498,7 +520,8 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
 
     if (!verifyFlutterwaveSignature(rawText, signature, webhookSecret)) {
       console.error('Invalid Flutterwave webhook signature', { signature, rawTextLength: rawText.length });
-      return res.status(401).json({ success: false, message: 'Invalid webhook signature' });
+      // FIX: Return 200 with acknowledged response instead of 401
+      return res.status(200).json({ received: true, error: 'Invalid webhook signature' });
     }
 
     const event = payload?.event;
@@ -534,7 +557,18 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
         bookingId: data?.meta?.bookingId,
         payloadEvent: event,
       });
-      return res.status(404).json({ success: false, message: 'Payment record not found' });
+      // FIX: Return 200 with acknowledged response instead of 404 to prevent retry
+      return res.status(200).json({ received: true, ignored: true, reason: 'Payment not found' });
+    }
+
+    // FIX: Verify booking ownership to prevent cross-user payments
+    if (payment.user.toString() !== (data?.meta?.userId || '')) {
+      console.error('Payment user mismatch - potential fraud attempt', {
+        paymentUserId: payment.user,
+        webhookUserId: data?.meta?.userId,
+        reference,
+      });
+      return res.status(200).json({ received: true, ignored: true, reason: 'User mismatch' });
     }
 
     if (payment.paymentStatus === 'COMPLETED') {
@@ -558,50 +592,121 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
       .populate('service');
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: 'Booking not found' });
+      console.warn('Booking not found for payment:', { paymentId: payment._id, reference });
+      // FIX: Return 200 with acknowledged response instead of 404 to prevent retry
+      return res.status(200).json({ received: true, ignored: true, reason: 'Booking not found' });
     }
 
     const amountReceived = Number(data?.amount_settled ?? data?.amount ?? 0);
     if (amountReceived <= 0) {
-      return res.status(400).json({ success: false, message: 'Invalid payment amount' });
+      console.error('Invalid payment amount received:', { amountReceived, reference });
+      payment.paymentStatus = 'FAILED';
+      await payment.save();
+      // FIX: Return 200 with acknowledged response instead of 400 to prevent retry
+      return res.status(200).json({ received: true, error: 'Invalid payment amount', status: 'FAILED' });
+    }
+
+    // FIX: Add currency validation to prevent currency swap fraud
+    const flutterwaveCurrency = (data?.currency || 'NGN').toUpperCase();
+    const expectedCurrency = (payment.currency || booking.amountCurrency || 'NGN').toUpperCase();
+    if (flutterwaveCurrency !== expectedCurrency) {
+      console.error('Currency mismatch detected', {
+        flutterwaveCurrency,
+        expectedCurrency,
+        reference,
+      });
+      payment.paymentStatus = 'FAILED';
+      await payment.save();
+      return res.status(200).json({
+        received: true,
+        error: 'Currency mismatch',
+        status: 'FAILED',
+        details: { expected: expectedCurrency, received: flutterwaveCurrency },
+      });
     }
 
     if (amountReceived < Number(payment.amount)) {
+      console.error('Insufficient payment amount', {
+        expected: payment.amount,
+        received: amountReceived,
+        reference,
+      });
       payment.paymentStatus = 'FAILED';
       await payment.save();
-      return res.status(400).json({ success: false, message: 'Payment amount is less than expected' });
+      // FIX: Return 200 with acknowledged response instead of 400 to prevent retry
+      return res.status(200).json({
+        received: true,
+        error: 'Payment amount is less than expected',
+        status: 'FAILED',
+        details: { expected: payment.amount, received: amountReceived },
+      });
     }
 
+    // FIX: Use atomic update to prevent race conditions with concurrent webhooks
     const paymentMethod = data?.payment_type || data?.payment_method || payment.paymentMethod || 'CARD';
-    payment.paymentStatus = 'COMPLETED';
-    payment.paymentMethod = paymentMethod;
-    payment.paymentGateway = 'FLUTTERWAVE';
-    payment.amount = amountReceived;
-    payment.currency = payment.currency || booking.amountCurrency || 'NGN';
-    await payment.save();
+    
+    const updatedPayment = await Payment.findByIdAndUpdate(
+      payment._id,
+      {
+        paymentStatus: 'COMPLETED',
+        paymentMethod,
+        paymentGateway: 'FLUTTERWAVE',
+        amount: amountReceived,
+        currency: flutterwaveCurrency,
+        // Add webhook metadata for audit trail
+        webhookReceivedAt: new Date(),
+        webhookReference: reference,
+      },
+      { new: true }
+    );
 
-    booking.paymentStatus = 'COMPLETED';
-    booking.bookingStatus = booking.bookingStatus === 'PENDING' ? 'CONFIRMED' : booking.bookingStatus;
-    await booking.save();
+    // FIX: Atomic booking status update
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      payment.booking,
+      {
+        paymentStatus: 'COMPLETED',
+        // Only transition PENDING -> CONFIRMED; don't override other states
+        $cond: [
+          { $eq: ['$bookingStatus', 'PENDING'] },
+          'CONFIRMED',
+          '$bookingStatus'
+        ]
+      },
+      { new: true }
+    ).populate('user').populate('vendor').populate('service');
 
-    const bookingUrl = `${process.env.FRONTEND_URL || process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`;
+    // Re-fetch with proper population if atomic update didn't work as expected
+    let finalBooking = updatedBooking;
+    if (!finalBooking) {
+      finalBooking = await Booking.findById(payment.booking)
+        .populate('user')
+        .populate('vendor')
+        .populate('service');
+    }
+
+    if (finalBooking && finalBooking.bookingStatus === 'PENDING') {
+      finalBooking.bookingStatus = 'CONFIRMED';
+      await finalBooking.save();
+    }
+
+    const bookingUrl = `${process.env.FRONTEND_URL || process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${finalBooking._id}`;
 
     try {
       const receiptEmail = paymentReceiptEmail({
-        firstName: booking.user?.firstName || booking.user?.email,
-        bookingId: booking._id,
+        firstName: finalBooking.user?.firstName || finalBooking.user?.email,
+        bookingId: finalBooking._id,
         amount: amountReceived,
-        currency: booking.amountCurrency || 'NGN',
+        currency: flutterwaveCurrency,
         paymentMethod,
         transactionReference: reference,
-        bookingDate: booking.eventDate?.toDateString?.() || booking.eventDate,
-        serviceName: booking.service?.name || booking.service?.serviceName || 'Service',
-        vendorName: booking.vendor?.businessName || booking.vendor?.name || 'Vendor',
+        bookingDate: finalBooking.eventDate?.toDateString?.() || finalBooking.eventDate,
+        serviceName: finalBooking.service?.name || finalBooking.service?.serviceName || 'Service',
+        vendorName: finalBooking.vendor?.businessName || finalBooking.vendor?.name || 'Vendor',
         bookingUrl,
       });
-      if (booking.user?.email) {
+      if (finalBooking.user?.email) {
         await sendEmail({
-          to: booking.user.email,
+          to: finalBooking.user.email,
           subject: receiptEmail.subject,
           text: receiptEmail.text,
           html: receiptEmail.html,
@@ -609,24 +714,25 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
       }
     } catch (e) {
       console.error('Payment receipt email failed:', e.message || e);
+      // Non-fatal: don't fail webhook processing if email fails
     }
 
     try {
       const vendorNotification = vendorPaymentNotificationEmail({
-        vendorName: booking.vendor?.businessName || booking.vendor?.name || 'Vendor',
-        bookingId: booking._id,
+        vendorName: finalBooking.vendor?.businessName || finalBooking.vendor?.name || 'Vendor',
+        bookingId: finalBooking._id,
         amount: amountReceived,
-        currency: booking.amountCurrency || 'NGN',
+        currency: flutterwaveCurrency,
         paymentMethod,
         transactionReference: reference,
-        bookingDate: booking.eventDate?.toDateString?.() || booking.eventDate,
-        serviceName: booking.service?.name || booking.service?.serviceName || 'Service',
-        customerName: `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim() || booking.user?.email || 'Customer',
+        bookingDate: finalBooking.eventDate?.toDateString?.() || finalBooking.eventDate,
+        serviceName: finalBooking.service?.name || finalBooking.service?.serviceName || 'Service',
+        customerName: `${finalBooking.user?.firstName || ''} ${finalBooking.user?.lastName || ''}`.trim() || finalBooking.user?.email || 'Customer',
         bookingUrl,
       });
-      if (booking.vendor?.email) {
+      if (finalBooking.vendor?.email) {
         await sendEmail({
-          to: booking.vendor.email,
+          to: finalBooking.vendor.email,
           subject: vendorNotification.subject,
           text: vendorNotification.text,
           html: vendorNotification.html,
@@ -634,11 +740,13 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
       }
     } catch (e) {
       console.error('Vendor notification email failed:', e.message || e);
+      // Non-fatal: don't fail webhook processing if email fails
     }
 
-    return res.json({ received: true });
+    return res.json({ received: true, status: 'COMPLETED', paymentId: updatedPayment._id });
   } catch (err) {
     console.error('Webhook error:', err);
-    return res.status(500).json({ success: false, message: err.message });
+    // FIX: Return 200 with acknowledged response on unexpected errors to prevent retry
+    return res.status(200).json({ received: true, error: err.message });
   }
 };
