@@ -19,8 +19,34 @@
             <span class="fw-bold">Book Me Events</span>
           </span>
         </a>
-        <div class="ms-auto d-flex gap-2">
-          <a class="btn btn-soft" href="auth-login.html">Back to login</a>
+
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navVerifyEmailContent"
+          aria-controls="navVerifyEmailContent"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div id="navVerifyEmailContent" class="collapse navbar-collapse">
+          <div class="ms-auto d-flex gap-2 align-items-center justify-content-end flex-wrap">
+            <a class="btn btn-soft" href="auth-login.html">Back to login</a>
+
+            <button
+              id="themeToggleBtn"
+              class="btn btn-soft btn-sm bme-theme-toggle"
+              type="button"
+              aria-label="Toggle dark/light theme"
+              title="Toggle theme"
+            >
+              <span data-icon="sun">☀️</span>
+              <span data-icon="moon">🌙</span>
+            </button>
+          </div>
         </div>
       </div>
     </nav>

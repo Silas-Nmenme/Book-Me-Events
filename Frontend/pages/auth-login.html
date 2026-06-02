@@ -20,19 +20,33 @@
           </span>
         </a>
 
-        <div class="ms-auto d-flex gap-2">
-          <a class="btn btn-soft" href="index.html">Home</a>
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navAuthLoginContent"
+          aria-controls="navAuthLoginContent"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
 
-          <button
-            id="themeToggleBtn"
-            class="btn btn-soft btn-sm bme-theme-toggle"
-            type="button"
-            aria-label="Toggle dark/light theme"
-            title="Toggle theme"
-          >
-            <span data-icon="sun">☀️</span>
-            <span data-icon="moon">🌙</span>
-          </button>
+        <div id="navAuthLoginContent" class="collapse navbar-collapse">
+          <div class="ms-auto d-flex gap-2 align-items-center justify-content-end flex-wrap">
+            <a class="btn btn-soft" href="auth-register.html">Sign up</a>
+
+            <button
+              id="themeToggleBtn"
+              class="btn btn-soft btn-sm bme-theme-toggle"
+              type="button"
+              aria-label="Toggle dark/light theme"
+              title="Toggle theme"
+            >
+              <span data-icon="sun">☀️</span>
+              <span data-icon="moon">🌙</span>
+            </button>
+          </div>
         </div>
       </div>
     </nav>
