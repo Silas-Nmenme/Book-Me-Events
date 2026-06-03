@@ -261,20 +261,33 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
       });
     }
 
-    // Generate a reset token (JWT) and send it in the reset link.
-    // NOTE: The User model currently does not implement getResetPasswordToken(),
-    // so we create a compatible token here.
-    const jwt = require('jsonwebtoken');
-    const resetToken = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_RESET_EXPIRE || '15m' }
+    // DB-backed single-use reset token
+    const crypto = require('crypto');
+    const PasswordResetToken = require('../models/PasswordResetToken');
+
+    // Revoke any outstanding reset tokens for this user (keeps it revocable)
+    await PasswordResetToken.updateMany(
+      { userId: user._id, purpose: 'password_reset', revokedAt: null, usedAt: null },
+      { $set: { revokedAt: new Date() } }
     );
 
+    // Create a random token and store only its hash
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
- 
+    const resetMinutes = Number(process.env.JWT_RESET_EXPIRE_MINUTES || 15);
+    const expiresAt = new Date(Date.now() + resetMinutes * 60 * 1000);
+
+    await PasswordResetToken.create({
+      userId: user._id,
+      tokenHash,
+      purpose: 'password_reset',
+      expiresAt,
+    });
+
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.app';
     const resetUrl = `${FRONTEND_URL.replace(/\/+$/, '')}/reset-password.html?token=${encodeURIComponent(resetToken)}`;
+
 
 
 
@@ -324,26 +337,50 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     throw new Error('Passwords do not match');
   }
 
-  // NOTE: For real security, validate the reset token and expiration.
-  // This code currently trusts the token structure if JWT_SECRET is valid.
-  // If verification is required, we should persist reset token hashes + expiry.
-  const jwt = require('jsonwebtoken');
-  let decoded;
-  try {
-    decoded = jwt.verify(req.params.token, process.env.JWT_SECRET);
-  } catch (e) {
+// DB-backed single-use password reset tokens
+  const crypto = require('crypto');
+  const PasswordResetToken = require('../models/PasswordResetToken');
+
+
+  if (!req.params.token) {
+    res.status(400);
+    throw new Error('Reset token is required');
+  }
+
+  // Hash the raw token using the same algorithm as in forgotPassword
+  const tokenHash = crypto.createHash('sha256').update(req.params.token).digest('hex');
+
+  const resetToken = await PasswordResetToken.findOne({ tokenHash }).populate('userId');
+
+  if (!resetToken || !resetToken.userId) {
     res.status(400);
     throw new Error('Invalid or expired reset token');
   }
 
-  const user = await User.findById(decoded.id);
-  if (!user) {
-    res.status(404);
-    throw new Error('User not found');
+  if (resetToken.revokedAt) {
+    res.status(400);
+    throw new Error('Reset token has been revoked');
   }
 
+  if (resetToken.usedAt) {
+    res.status(400);
+    throw new Error('Reset token has already been used');
+  }
+
+  if (new Date() > resetToken.expiresAt) {
+    res.status(400);
+    throw new Error('Invalid or expired reset token');
+  }
+
+  // Update password
+  const user = resetToken.userId;
   user.password = password;
   await user.save();
+
+  // Mark token as used (single-use)
+  resetToken.usedAt = new Date();
+  await resetToken.save();
+
 
   const { subject, text, html } = passwordResetSuccessEmail({ firstName: user.firstName });
 

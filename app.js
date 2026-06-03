@@ -5,8 +5,19 @@ const cors = require('cors');
 const morgan = require('morgan');
 
 const { errorHandler } = require('./src/middlewares/errorMiddleware');
+const { securityHeaders } = require('./src/middlewares/securityHeaders');
+const {
+  loginLimiterByAccount,
+  loginLimiterByIp,
+  otpLimiter,
+  forgotPasswordLimiter,
+  resetPasswordLimiter,
+} = require('./src/middlewares/rateLimiters');
 
 const app = express();
+
+// Security headers (Helmet)
+app.use(...securityHeaders);
 
 /**
  * ===== CORE MIDDLEWARE =====
@@ -32,6 +43,14 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// (Optional) Basic rate limits on auth endpoints to prevent brute-force/OTP guessing.
+app.use('/api/v1/auth/login', loginLimiterByIp, loginLimiterByAccount);
+app.use('/api/v1/auth/verify-otp', otpLimiter);
+app.use('/api/v1/auth/forgot-password', forgotPasswordLimiter);
+app.use('/api/v1/auth/reset-password', resetPasswordLimiter);
+
+
 
 /**
  * ===== HEALTH CHECK =====

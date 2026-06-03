@@ -4,3 +4,10 @@
 - [ ] Step 2: Audit `Frontend/pages/*.html` for navbar + theme toggle consistency (presence of `#themeToggleBtn`, correct classes/markup pattern).
 - [ ] Step 3: Update any outlier pages to match the working navbar/theme-toggle markup.
 - [ ] Step 4: Quick manual verification plan (landing/login/dashboard) after changes.
+
+# Security hardening (in progress)
+- [x] A) Password reset: switch from stateless JWT reset links to DB-backed single-use tokens
+- [x] c) Socket.io: JWT authorization + enforced room join
+- [ ] b) TOTP 2FA: Admin enforced; User/Vendor optional
+- [ ] d) IDOR audit/ownership hardening sweep
+
