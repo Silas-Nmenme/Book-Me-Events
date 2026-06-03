@@ -1,5 +1,5 @@
 const asyncHandler = require('express-async-handler');
-const jwt = require('jsonwebtoken');
+
 
 const User = require('../models/User');
 const { generateToken } = require('../utils/generateToken');
@@ -130,6 +130,7 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
 // @route   POST /api/v1/auth/login
 // @access  Public
 exports.login = asyncHandler(async (req, res) => {
+
   const { email, password } = req.body;
 
   // Validation
@@ -170,6 +171,40 @@ exports.login = asyncHandler(async (req, res) => {
 
   // Remove password from response
   user.password = undefined;
+
+  // Admin-enforced TOTP 2FA
+  // Requirement: Admin must always have TOTP enabled.
+  if (user.role === 'ADMIN') {
+    if (!user.totpEnabled || !user.totpSecret) {
+      res.status(403);
+      throw new Error('2FA required for admin accounts');
+    }
+
+    // Expect totpCode in request body
+    const { totpCode } = req.body;
+    if (!totpCode) {
+      res.status(403);
+      throw new Error('2FA code required');
+    }
+
+    const speakeasy = require('speakeasy');
+
+    const verified = speakeasy.totp.verify({
+      secret: user.totpSecret,
+      encoding: 'ascii',
+      token: totpCode.toString(),
+      window: 1,
+    });
+
+    if (!verified) {
+      res.status(401);
+      throw new Error('Invalid 2FA code');
+    }
+
+    user.totpVerifiedAt = new Date();
+    await user.save();
+  }
+
 
   // Generate token
   if (!process.env.JWT_SECRET) {

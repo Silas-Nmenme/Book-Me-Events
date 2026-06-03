@@ -20,7 +20,15 @@ const userSchema = new mongoose.Schema(
     otpExpiresAt: { type: Date },
     otpPurpose: { type: String },
     otpVerifiedAt: { type: Date },
+
+    // TOTP 2FA (Admin enforced)
+    totpEnabled: { type: Boolean, default: false },
+    // For security, store the TOTP secret encrypted in a real app.
+    // Current scope stores plaintext secret because no encryption util exists.
+    totpSecret: { type: String },
+    totpVerifiedAt: { type: Date },
   },
+
   { timestamps: true }
 );
 
