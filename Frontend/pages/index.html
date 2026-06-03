@@ -10,9 +10,31 @@
     <link rel="stylesheet" href="../css/styles.css" />
 
     <style>
-      /* Page-specific UI polish (kept local so rest of the site won't be affected) */
+      /* Mobile-app feel + new color palette (page-scoped so other pages are unaffected) */
+      :root{
+        --bme-brand3:#ff4d8d;     /* magenta-pink */
+        --bme-brand4:#2ee9a6;     /* mint */
+        --bme-hero-grad: linear-gradient(135deg, var(--bme-brand3), var(--bme-brand4));
+        --bme-kicker-bg: rgba(255,77,141,.14);
+        --bme-kicker-brd: rgba(255,77,141,.38);
+      }
+
       .bme-hero{
-        padding: 64px 0 28px;
+        padding: 72px 0 26px;
+        position: relative;
+      }
+
+      /* Soft app-like gradient background card */
+      .bme-hero::before{
+        content:"";
+        position:absolute;
+        inset:-40px -20px auto -20px;
+        height: 280px;
+        background:
+          radial-gradient(700px 240px at 20% 20%, rgba(255,77,141,.18), transparent 55%),
+          radial-gradient(650px 240px at 90% 20%, rgba(46,233,166,.16), transparent 50%),
+          linear-gradient(180deg, rgba(255,255,255,.00), rgba(255,255,255,.00));
+        pointer-events:none;
       }
 
       .bme-hero-kicker{
@@ -21,16 +43,16 @@
         gap: 10px;
         padding: 10px 14px;
         border-radius: 999px;
-        background: rgba(124,92,255,.12);
-        border: 1px solid rgba(124,92,255,.35);
+        background: var(--bme-kicker-bg);
+        border: 1px solid var(--bme-kicker-brd);
       }
 
       .bme-hero-kicker .dot{
         width: 10px;
         height: 10px;
         border-radius: 50%;
-        background: linear-gradient(135deg, var(--brand), var(--brand2));
-        box-shadow: 0 0 0 4px rgba(124,92,255,.18);
+        background: var(--bme-hero-grad);
+        box-shadow: 0 0 0 4px rgba(255,77,141,.16);
       }
 
       .bme-hero-title{
@@ -39,19 +61,33 @@
         letter-spacing: -0.02em;
         margin-top: 16px;
         margin-bottom: 14px;
+        font-size: clamp(2rem, 5vw, 2.7rem);
       }
 
       .bme-hero-lead{
         max-width: 62ch;
-        font-size: 1.06rem;
+        font-size: 1.02rem;
+      }
+
+      .gradient-text{
+        background: var(--bme-hero-grad);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
 
       .bme-cta-row{ gap: 12px; flex-wrap: wrap; }
+
+      /* App-like bottom-sheet spacing on mobile */
+      .bme-hero .card-glass{
+        border-radius: 20px;
+      }
 
       .bme-stat-card{
         height: 100%;
         padding: 18px;
         border-radius: 16px;
+        background: rgba(255,255,255,.06);
       }
 
       .bme-section-title{
@@ -72,12 +108,12 @@
       .bme-icon{
         width: 40px;
         height: 40px;
-        border-radius: 12px;
+        border-radius: 14px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: rgba(124,92,255,.12);
-        border: 1px solid rgba(124,92,255,.28);
+        background: rgba(255,77,141,.10);
+        border: 1px solid rgba(255,77,141,.25);
         font-size: 18px;
       }
 
@@ -92,14 +128,56 @@
         width: 88px;
         padding: 10px 12px;
         border-radius: 999px;
-        background: rgba(124,92,255,.16);
-        border: 1px solid rgba(124,92,255,.35);
+        background: rgba(255,77,141,.14);
+        border: 1px solid rgba(255,77,141,.34);
         font-weight: 900;
         letter-spacing: .2px;
       }
 
+      /* Mobile app spacing + safe areas */
+      main{ padding-bottom: env(safe-area-inset-bottom); }
+
+      /* Make the layout feel like a phone app: stack content, slightly larger touch targets */
+      .bme-cta-row .btn{ min-height: 48px; }
+
+      /* Better tap/reading on small screens */
+      @media (max-width: 576px){
+        .bme-hero{ padding-top: 56px; }
+        .bme-hero-title{ margin-top: 10px; margin-bottom: 10px; }
+        .bme-hero-lead{ font-size: 1rem; }
+        .bme-stat-card{ padding: 16px; }
+        .bme-service-tile{ padding: 16px; }
+      }
+
+      /* Ensure cards don't feel cramped on intermediate tablets */
+      @media (min-width: 577px) and (max-width: 991px){
+        .bme-hero{ padding-top: 64px; }
+      }
+
       .bme-footer{
         padding: 46px 0;
+      }
+
+      /* Bottom nav hint (visual only; no behavior) */
+      .bme-mobile-nav-shadow{
+        display:none;
+      }
+      @media (max-width: 768px){
+        .bme-mobile-nav-shadow{
+          display:block;
+          position: sticky;
+          bottom: 0;
+          z-index: 5;
+          height: 16px;
+          background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.18));
+          pointer-events:none;
+          margin-top: -10px;
+        }
+      }
+
+      /* Reduce motion for users who prefer it */
+      @media (prefers-reduced-motion: reduce){
+        .fade-slide{ transition: none !important; }
       }
     </style>
   </head>
@@ -107,7 +185,7 @@
   <body>
     <div id="toastHost" class="position-fixed top-0 end-0 p-3"></div>
 
-    <nav class="navbar navbar-dark navbar-glass sticky-top bme-navbar">
+    <nav class="navbar navbar-dark navbar-glass sticky-top bme-navbar" role="navigation">
       <div class="container">
         <a class="navbar-brand" href="index.html" aria-label="Book Me Events home">
           <span class="brand-pill">
@@ -200,8 +278,12 @@
               </p>
 
               <div class="d-flex bme-cta-row mt-4">
-                <a href="services.html" class="btn btn-brand btn-lg">Explore Services</a>
-                <a href="auth-register.html" class="btn btn-soft btn-lg">Join &amp; Request Services</a>
+                <a href="services.html" class="btn btn-brand btn-lg" aria-label="Explore Services">
+                  Explore Services
+                </a>
+                <a href="auth-register.html" class="btn btn-soft btn-lg" aria-label="Join and request services">
+                  Join &amp; Request Services
+                </a>
               </div>
 
               <div class="row g-3 mt-4">
@@ -243,7 +325,9 @@
                   <li class="mb-2"><span class="fw-bold">4.</span> Book, pay, and track progress</li>
                 </ul>
 
-                <a href="auth-login.html" class="btn btn-brand w-100">Sign in to start</a>
+                <a href="auth-login.html" class="btn btn-brand w-100" aria-label="Sign in to start">
+                  Sign in to start
+                </a>
                 <p class="bme-muted small mt-3 mb-0">
                   Tip: After login, manage requests, messages, and bookings in your dashboard.
                 </p>
@@ -252,6 +336,8 @@
           </div>
         </div>
       </section>
+
+      <div class="bme-mobile-nav-shadow" aria-hidden="true"></div>
 
       <!-- SERVICES -->
       <section id="serviceCategories" class="section">
