@@ -287,9 +287,35 @@ export async function sendMessage(payload) {
 export async function sendMessageByRequestId({ requestId, messageContent, attachments, subject, booking } = {}) {
   return apiFetch(`/api/v1/messages/request/${encodeURIComponent(requestId)}`, {
     method: 'POST',
-    body: JSON.stringify({ messageContent, attachments, subject, booking }),
+    body: JSON.stringify({
+      messageContent,
+      attachments,
+      subject,
+      booking,
+    }),
   });
 }
+
+// Upload one or more files and return Cloudinary URLs.
+// Used for chat attachments.
+export async function uploadMessageAttachments(files = []) {
+  if (!Array.isArray(files) || !files.length) return [];
+
+  const form = new FormData();
+  // Backend upload expects multipart/form-data with field name `image`.
+  // We'll upload each file as a separate request to keep response handling simple/reliable.
+  const urls = [];
+  for (const file of files) {
+    if (!file) continue;
+    form.delete('image');
+    form.set('image', file);
+    const res = await apiFetch('/api/v1/uploads/generic', { method: 'POST', body: form });
+    const data = res?.data || res;
+    if (data?.url) urls.push(data.url);
+  }
+  return urls;
+}
+
 
 
 export async function markMessageAsRead(id) {
