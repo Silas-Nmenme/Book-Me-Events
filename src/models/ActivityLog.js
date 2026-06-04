@@ -2,12 +2,16 @@ const mongoose = require('mongoose');
 
 const activityLogSchema = new mongoose.Schema(
   {
+    // IMPORTANT: audit log is intended to be append-only.
+    // This schema intentionally disallows any mutation endpoints in controllers.
+    // Do not add update routes.
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
       index: true,
     },
+
 
     actor: {
       type: mongoose.Schema.Types.ObjectId,

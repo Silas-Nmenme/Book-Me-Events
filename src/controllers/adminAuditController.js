@@ -5,6 +5,8 @@ const ActivityLog = require('../models/ActivityLog');
 exports.getAuditEvents = asyncHandler(async (req, res) => {
   const {
     userId,
+    actionType,
+
     actorId,
     entityType,
     entityId,

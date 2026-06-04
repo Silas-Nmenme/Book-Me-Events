@@ -200,7 +200,23 @@ exports.rejectVendor = asyncHandler(async (req, res) => {
 
   await vendor.save();
 
+  // Audit (append-only): moderation action recorded.
+
+  try {
+    const { logActivity } = require('../utils/activityLog');
+    await logActivity({
+      userId: vendor.user?.toString?.() || vendor.user,
+      actorId: req.user?.id,
+actionType: 'VENDOR_KYC_APPROVED',
+      entityType: 'VENDOR',
+      entityId: vendor._id,
+      metadata: { reason: null },
+      severity: 'ACTION',
+    });
+  } catch (e) {}
+
   res.status(200).json({
+
     success: true,
     message: 'Vendor KYC rejected',
     data: {

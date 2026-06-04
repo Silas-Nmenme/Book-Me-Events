@@ -38,9 +38,42 @@
             ActivityLog exists in the backend, but Stage 3 read-only admin governance endpoints are not yet wired.
           </div>
 
-          <div id="auditPlaceholder" class="alert alert-info mb-0">
-            Implement endpoints: <code>GET /api/v1/admin/audit</code> and update admin UI.
+          <div class="row g-3 mb-3">
+            <div class="col-12 col-md-4">
+              <label class="form-label">Filter entityType</label>
+              <input id="filterEntityType" class="form-control" placeholder="e.g., VENDOR" />
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Filter actionType</label>
+              <input id="filterActionType" class="form-control" placeholder="e.g., VENDOR_KYC_APPROVED" />
+            </div>
+            <div class="col-12 col-md-4 d-flex align-items-end">
+              <button id="btnRefresh" class="btn btn-primary w-100" type="button">Load audit</button>
+            </div>
           </div>
+
+          <div id="errorBox" class="alert alert-danger d-none"></div>
+          <div id="loadingBox" class="text-muted-soft small">Loading…</div>
+
+          <div id="signalsRoot" class="d-none">
+            <div class="table-responsive bme-scroll-panel mt-2">
+              <table class="table table-dark table-hover">
+                <thead>
+                  <tr>
+                    <th>Entity</th>
+                    <th>Action</th>
+                    <th>User</th>
+                    <th>Actor</th>
+                    <th>EntityId</th>
+                    <th>Severity</th>
+                    <th>Occurred</th>
+                  </tr>
+                </thead>
+                <tbody id="auditBody"></tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
