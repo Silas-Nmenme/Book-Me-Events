@@ -118,6 +118,15 @@ safeRoute('/api/v1/tickets', require('./src/routes/ticketRoutes'));
 // ADMIN MVP: fraud signals
 safeRoute('/api/v1/fraud', require('./src/routes/fraudSignalsRoutes'));
 
+// ADMIN MVP: audit log
+safeRoute('/api/v1/admin', require('./src/routes/adminAuditRoutes'));
+
+
+// Admin audit immutable log readers (separate prefix kept for future granularity)
+// (No additional routes here)
+
+
+
 
 
 
