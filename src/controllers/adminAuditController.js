@@ -6,11 +6,9 @@ exports.getAuditEvents = asyncHandler(async (req, res) => {
   const {
     userId,
     actionType,
-
     actorId,
     entityType,
     entityId,
-    actionType,
     severity,
     page = 1,
     limit = 20,
