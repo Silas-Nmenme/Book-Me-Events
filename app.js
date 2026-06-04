@@ -115,6 +115,10 @@ safeRoute('/api/v1/vendors', require('./src/routes/vendorAnalyticsRoutes'));
 
 safeRoute('/api/v1/tickets', require('./src/routes/ticketRoutes'));
 
+// ADMIN MVP: fraud signals
+safeRoute('/api/v1/fraud', require('./src/routes/fraudSignalsRoutes'));
+
+
 
 
 

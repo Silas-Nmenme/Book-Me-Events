@@ -114,7 +114,18 @@ exports.verifyVendor = asyncHandler(async (req, res) => {
 
   vendor.isVerified = true;
   vendor.verificationDate = new Date();
+
+  // Stage 3 — KYC workflow state
+  vendor.kycStatus = 'APPROVED';
+  vendor.kycReviewedAt = new Date();
+  vendor.kycReviewedBy = req.user?.id || undefined;
+
+  // Keep legacy boolean consistent with KYC state.
+  vendor.isVerified = true;
+
   await vendor.save();
+
+
 
   // Best-effort: do not fail verification if email fails
   try {
@@ -144,7 +155,7 @@ exports.verifyVendor = asyncHandler(async (req, res) => {
 });
 
 
-// @desc    Reject vendor
+// @desc    KYC review reject vendor (no delete)
 // @route   PUT /api/v1/admin/vendors/:id/reject
 // @access  Private/Admin
 exports.rejectVendor = asyncHandler(async (req, res) => {
@@ -157,7 +168,7 @@ exports.rejectVendor = asyncHandler(async (req, res) => {
     throw new Error('Vendor not found');
   }
 
-  // Best-effort: email first, then delete
+  // Best-effort: email first, then update KYC status
   try {
     const { subject, text, html } = vendorVerificationRejectedEmail({
       recipientName: vendor.user?.firstName || vendor.user?.lastName || 'there',
@@ -178,13 +189,28 @@ exports.rejectVendor = asyncHandler(async (req, res) => {
     console.error('Vendor verification rejected email failed:', err.message);
   }
 
-  await Vendor.findByIdAndDelete(req.params.id);
+  // KYC workflow (MVP-compatible): keep vendor, mark rejected with reason.
+  // NOTE: We store KYC-related fields directly on Vendor schema; fields are added in Stage 3.
+  vendor.kycStatus = 'REJECTED';
+  vendor.kycReviewReason = reason || 'Not provided';
+  vendor.kycReviewedAt = new Date();
+
+  // Keep legacy boolean consistent (a rejected vendor is not verified).
+  vendor.isVerified = false;
+
+  await vendor.save();
 
   res.status(200).json({
     success: true,
-    message: 'Vendor rejected and deleted',
+    message: 'Vendor KYC rejected',
+    data: {
+      vendorId: vendor._id,
+      kycStatus: vendor.kycStatus,
+      kycReviewReason: vendor.kycReviewReason,
+    },
   });
 });
+
 
 
 // @desc    Disable/Enable user

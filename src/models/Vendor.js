@@ -22,8 +22,22 @@ const vendorSchema = new mongoose.Schema(
     // Admin-verifiable KYC document (uploaded by vendor)
     kycDocumentUrl: { type: String },
     kycDocumentPublicId: { type: String },
+
+    // Stage 3 — KYC review workflow (immutable history to be handled by audit logs)
+    kycStatus: {
+      type: String,
+      enum: ['PENDING', 'APPROVED', 'REJECTED'],
+      default: 'PENDING',
+      index: true,
+    },
+    kycReviewedAt: { type: Date },
+    kycReviewReason: { type: String },
+
+    // Keep a pointer to the admin who last reviewed (optional)
+    kycReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
+
 
 module.exports = mongoose.model('Vendor', vendorSchema);
