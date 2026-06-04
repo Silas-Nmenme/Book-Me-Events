@@ -70,10 +70,11 @@ export async function apiFetch(path, options = {}) {
   return data;
 }
 
-export async function loginUser({ email, password }) {
+export async function loginUser({ email, password, totpCode } = {}) {
+  const payload = totpCode ? { email, password, totpCode } : { email, password };
   return apiFetch('/api/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(payload),
   });
 }
 
