@@ -125,7 +125,7 @@ exports.createRequest = asyncHandler(async (req, res) => {
     throw new Error('eventDescription is required');
   }
 
-  const request = await Request.create({
+const request = await Request.create({
     user: req.user.id,
     vendor,
     service: resolvedServiceId || undefined,
@@ -136,6 +136,18 @@ exports.createRequest = asyncHandler(async (req, res) => {
     budgetAmount,
     notes,
     responseDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+  });
+
+  // USER activity
+  const { logActivity } = require('../utils/activityLog');
+  await logActivity({
+    userId: req.user.id,
+    actorId: req.user.id,
+    actionType: 'REQUEST_CREATED',
+    entityType: 'REQUEST',
+    entityId: request._id,
+    metadata: { vendor: vendor?.toString?.() || vendor, service: resolvedServiceId },
+    severity: 'ACTION',
   });
 
 
@@ -172,6 +184,18 @@ exports.acceptRequest = asyncHandler(async (req, res) => {
   request.status = 'ACCEPTED';
   await request.save();
 
+  // USER + VENDOR activity (user is request.user)
+  const { logActivity } = require('../utils/activityLog');
+  await logActivity({
+    userId: request.user.toString(),
+    actorId: req.user.id,
+    actionType: 'REQUEST_ACCEPTED',
+    entityType: 'REQUEST',
+    entityId: request._id,
+    metadata: { vendor: request.vendor?.toString?.() || request.vendor },
+    severity: 'SUCCESS',
+  });
+
   res.status(200).json({
     success: true,
     message: 'Request accepted successfully',
@@ -203,6 +227,16 @@ exports.declineRequest = asyncHandler(async (req, res) => {
   request.status = 'DECLINED';
   await request.save();
 
+  const { logActivity } = require('../utils/activityLog');
+  await logActivity({
+    userId: request.user.toString(),
+    actorId: req.user.id,
+    actionType: 'REQUEST_DECLINED',
+    entityType: 'REQUEST',
+    entityId: request._id,
+    severity: 'WARN',
+  });
+
   res.status(200).json({
     success: true,
     message: 'Request declined successfully',
@@ -229,6 +263,16 @@ exports.cancelRequest = asyncHandler(async (req, res) => {
 
   request.status = 'CANCELLED';
   await request.save();
+
+  const { logActivity } = require('../utils/activityLog');
+  await logActivity({
+    userId: request.user.toString(),
+    actorId: req.user.id,
+    actionType: 'REQUEST_CANCELLED',
+    entityType: 'REQUEST',
+    entityId: request._id,
+    severity: 'WARN',
+  });
 
   res.status(200).json({
     success: true,

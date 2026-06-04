@@ -184,8 +184,12 @@ exports.addVendorResponse = asyncHandler(async (req, res) => {
     throw new Error('Review not found');
   }
 
-  // Check if user is the vendor
-  if (review.vendor.toString() !== req.user._id && req.user.role !== 'ADMIN') {
+  // Check if user is the vendor owner
+  // review.vendor is a Vendor._id; req.user is a User.
+  const Vendor = require('../models/Vendor');
+  const myVendor = await Vendor.findOne({ user: req.user.id });
+
+  if (review.vendor.toString() !== (myVendor?._id?.toString?.() || '') && req.user.role !== 'ADMIN') {
     res.status(403);
     throw new Error('Not authorized to respond to this review');
   }

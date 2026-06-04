@@ -122,6 +122,17 @@ exports.createBooking = asyncHandler(async (req, res) => {
     specialRequests,
   });
 
+  const { logActivity } = require('../utils/activityLog');
+  await logActivity({
+    userId: req.user.id,
+    actorId: req.user.id,
+    actionType: 'BOOKING_CREATED',
+    entityType: 'BOOKING',
+    entityId: booking._id,
+    metadata: { request: request?.toString?.() || request },
+    severity: 'SUCCESS',
+  });
+
   // Link booking back to request and mark as BOOKED
   try {
     serviceRequest.status = 'BOOKED';
@@ -222,6 +233,17 @@ exports.cancelBooking = asyncHandler(async (req, res) => {
 
   booking.bookingStatus = 'CANCELLED';
   booking.cancellationReason = cancellationReason;
+
+  const { logActivity } = require('../utils/activityLog');
+  await logActivity({
+    userId: booking.user.toString(),
+    actorId: req.user.id,
+    actionType: 'BOOKING_CANCELLED',
+    entityType: 'BOOKING',
+    entityId: booking._id,
+    metadata: { reason: cancellationReason },
+    severity: 'WARN',
+  });
   booking.cancellationDate = new Date();
   booking.paymentStatus = 'REFUNDED';
 
@@ -255,6 +277,16 @@ exports.completeBooking = asyncHandler(async (req, res) => {
 
   booking.bookingStatus = 'COMPLETED';
   await booking.save();
+
+  const { logActivity } = require('../utils/activityLog');
+  await logActivity({
+    userId: booking.user.toString(),
+    actorId: req.user.id,
+    actionType: 'BOOKING_COMPLETED',
+    entityType: 'BOOKING',
+    entityId: booking._id,
+    severity: 'SUCCESS',
+  });
 
   res.status(200).json({
     success: true,

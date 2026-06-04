@@ -124,6 +124,21 @@ exports.getPayment = async (req, res) => {
       });
     }
 
+    // Enforce access control: USER can only read their own payments;
+    // VENDOR can only read payments tied to their vendor profile;
+    // ADMIN can read all.
+    if (req.user.role !== 'ADMIN') {
+      const isOwner = payment.user && payment.user._id && payment.user._id.toString() === req.user.id;
+      const isVendorOwner = payment.vendor && payment.vendor._id && payment.vendor._id.toString() === req.user.id;
+
+      if (!isOwner && !isVendorOwner) {
+        return res.status(403).json({
+          success: false,
+          message: 'Not authorized to view this payment'
+        });
+      }
+    }
+
     return res.status(200).json({
       success: true,
       data: payment
@@ -228,6 +243,18 @@ exports.createPayment = async (req, res) => {
       console.error('Vendor payment notification email failed:', e.message);
     }
 
+    // Activity for user
+    const { logActivity } = require('../utils/activityLog');
+    await logActivity({
+      userId: req.user.id,
+      actorId: req.user.id,
+      actionType: 'PAYMENT_COMPLETED',
+      entityType: 'PAYMENT',
+      entityId: payment._id,
+      metadata: { booking: payment.booking?.toString?.() || payment.booking },
+      severity: 'SUCCESS',
+    });
+
     return res.status(201).json({
       success: true,
       message: 'Payment processed successfully',
@@ -303,6 +330,17 @@ exports.refundPayment = async (req, res) => {
 
     payment.paymentStatus = 'REFUNDED';
     payment.refundAmount = payment.amount;
+
+    const { logActivity } = require('../utils/activityLog');
+    await logActivity({
+      userId: payment.user.toString(),
+      actorId: req.user.id,
+      actionType: 'PAYMENT_REFUNDED',
+      entityType: 'PAYMENT',
+      entityId: payment._id,
+      metadata: { booking: payment.booking },
+      severity: 'WARN',
+    });
     payment.refundReason = refundReason;
     payment.refundDate = new Date();
 

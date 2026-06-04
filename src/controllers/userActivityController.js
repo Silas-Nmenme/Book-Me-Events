@@ -1,0 +1,77 @@
+const asyncHandler = require('express-async-handler');
+const ActivityLog = require('../models/ActivityLog');
+const Booking = require('../models/Booking');
+const Payment = require('../models/Payment');
+
+// USER: activity feed
+exports.getMyActivity = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const safePage = Math.max(parseInt(page, 10) || 1, 1);
+  const safeLimit = Math.max(parseInt(limit, 10) || 20, 1);
+
+  const skip = (safePage - 1) * safeLimit;
+
+  const items = await ActivityLog.find({ user: req.user.id })
+    .sort({ occurredAt: -1 })
+    .skip(skip)
+    .limit(safeLimit);
+
+  const total = await ActivityLog.countDocuments({ user: req.user.id });
+
+  res.status(200).json({
+    success: true,
+    count: items.length,
+    total,
+    pages: Math.ceil(total / safeLimit),
+    currentPage: safePage,
+    data: items,
+  });
+});
+
+// USER: booking tracking timeline (derived MVP)
+exports.getMyBookingTracking = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const safePage = Math.max(parseInt(page, 10) || 1, 1);
+  const safeLimit = Math.max(parseInt(limit, 10) || 20, 1);
+
+  const skip = (safePage - 1) * safeLimit;
+
+  const bookings = await Booking.find({ user: req.user.id })
+    .populate('vendor')
+    .populate('service')
+    .populate('request')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(safeLimit);
+
+  const bookingIds = bookings.map((b) => b._id);
+  const payments = await Payment.find({ booking: { $in: bookingIds } });
+  const paymentByBooking = new Map(payments.map((p) => [p.booking.toString(), p]));
+
+  const items = bookings.map((b) => {
+    const p = paymentByBooking.get(b._id.toString());
+    return {
+      booking: b,
+      payment: p || null,
+      timeline: [
+        { at: b.createdAt, label: 'Requested/Created booking record' },
+        { at: b.updatedAt, label: `Booking status: ${b.bookingStatus}` },
+        p
+          ? { at: p.updatedAt, label: `Payment status: ${p.paymentStatus}` }
+          : { at: null, label: 'Payment: not initiated' },
+      ].filter((x) => x.at !== null),
+    };
+  });
+
+  const total = await Booking.countDocuments({ user: req.user.id });
+
+  res.status(200).json({
+    success: true,
+    count: items.length,
+    total,
+    pages: Math.ceil(total / safeLimit),
+    currentPage: safePage,
+    data: items,
+  });
+});
+

@@ -106,6 +106,11 @@ safeRoute('/api/v1/announcements', require('./src/routes/announcementRoutes'));
 
 safeRoute('/api/v1/uploads', require('./src/routes/uploadRoutes'));
 
+// USER MVP: activity, announcements read/unread, tickets
+safeRoute('/api/v1/users', require('./src/routes/userActivityRoutes'));
+safeRoute('/api/v1/announcements', require('./src/routes/announcementReadRoutes'));
+safeRoute('/api/v1/tickets', require('./src/routes/ticketRoutes'));
+
 
 
 /**

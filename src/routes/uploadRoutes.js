@@ -80,6 +80,7 @@ router.post(
 // Example generic uploads if you need more later.
 router.post(
   '/generic',
+  protect,
   uploadSingle('image'),
   asyncHandler(async (req, res) => {
     const result = await uploadToCloudinary({
