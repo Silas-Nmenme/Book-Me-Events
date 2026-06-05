@@ -5,7 +5,7 @@ const { protect, authorize } = require('../middlewares/authMiddleware');
 const {
   setupAdmin2fa,
   verifyAdmin2faSetup,
-} = require('../controllers/admin2faController');
+} = require('../controllers/admin2faController.js');
 
 // Setup routes require an authenticated ADMIN (so only admins can setup their own 2FA).
 router.use(protect, authorize('ADMIN'));
