@@ -100,6 +100,7 @@ safeRoute('/api/v1/payments', require('./src/routes/paymentRoutes'));
 safeRoute('/api/v1/reviews', require('./src/routes/reviewRoutes'));
 safeRoute('/api/v1/messages', require('./src/routes/messageRoutes'));
 safeRoute('/api/v1/admin', require('./src/routes/adminRegisterRoutes'));
+safeRoute('/api/v1/admin', require('./src/routes/admin2faRoutes'));
 safeRoute('/api/v1/admin', require('./src/routes/adminRoutes'));
 
 // Dashboard analytics (user/vendor)
