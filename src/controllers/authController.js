@@ -173,7 +173,7 @@ exports.login = asyncHandler(async (req, res) => {
   user.password = undefined;
 
   // Admin-enforced TOTP 2FA
-  // Requirement: Admin must always have TOTP enabled.
+  // Requirement: Admin must enable TOTP before normal admin login proceeds.
   if (user.role === 'ADMIN') {
     if (!user.totpEnabled || !user.totpSecret) {
       res.status(403);
