@@ -154,7 +154,15 @@ exports.login = asyncHandler(async (req, res) => {
   // For admin 2FA flows, clients may send `password` with the admin password.
   const effectivePassword = password ?? adminPassword;
 
-  if (effectivePassword === undefined) {
+  // IMPORTANT: Some model methods expect a string. Force to string if present.
+  const normalizedEffectivePassword =
+    effectivePassword === undefined || effectivePassword === null
+      ? undefined
+      : effectivePassword.toString();
+
+  if (normalizedEffectivePassword === undefined) {
+    // In case we hit this, it means the client didn't send ANY password field.
+    // This used to cause a 500 deeper in matchPassword via a missing password.
     if (process.env.NODE_ENV === 'production') {
       console.log('Login request missing password fields:', {
         keys: Object.keys(req.body || {}),
@@ -164,6 +172,10 @@ exports.login = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Password is required');
   }
+
+  // Ensure we always use the validated password string for matching
+  const loginPassword = normalizedEffectivePassword;
+
 
 
   const loginEmail = (email || adminEmail || '').toString().trim();
