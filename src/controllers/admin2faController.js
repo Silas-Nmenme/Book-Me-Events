@@ -62,12 +62,20 @@ exports.setupAdmin2fa = asyncHandler(async (req, res) => {
  */
 exports.verifyAdmin2faSetup = asyncHandler(async (req, res) => {
   const adminId = req.user.id;
-  const { totpCode } = req.body;
+  let { totpCode } = req.body;
 
-  if (!totpCode) {
+  if (totpCode === undefined || totpCode === null) {
     res.status(400);
     throw new Error('totpCode is required');
   }
+
+  // Normalize/validate: frontend should send a 6-digit numeric string.
+  totpCode = String(totpCode).trim();
+  if (!/^\d{6}$/.test(totpCode)) {
+    res.status(400);
+    throw new Error(`totpCode must be a 6-digit number (received ${totpCode.length} chars)`);
+  }
+
 
   const user = await User.findById(adminId);
   if (!user) {
