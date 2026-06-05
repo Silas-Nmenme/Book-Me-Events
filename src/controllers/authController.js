@@ -142,8 +142,22 @@ exports.login = asyncHandler(async (req, res) => {
     username,
   } = req.body;
 
+  // Defensive validation: prevent model-level “password is required” errors / Vercel 500s
+  // when the client request arrives without a parsed JSON body.
+  if (!req.body || (password === undefined && adminPassword === undefined)) {
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Login request missing password fields:', {
+        keys: req.body ? Object.keys(req.body) : [],
+      });
+    }
+
+    res.status(400);
+    throw new Error('Password is required');
+  }
+
   const loginEmail = (email || adminEmail || '').toString().trim();
   const loginPassword = (password || adminPassword || '').toString();
+
 
 
   // Validation
