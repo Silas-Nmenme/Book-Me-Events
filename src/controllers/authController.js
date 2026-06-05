@@ -131,16 +131,36 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
 // @access  Public
 exports.login = asyncHandler(async (req, res) => {
 
-  const { email, password } = req.body;
+
+  // Admin + user can share the same login endpoint.
+  // Some admin login UIs may send admin-specific fields; normalize them.
+  const {
+    email,
+    password,
+    adminEmail,
+    adminPassword,
+    username,
+  } = req.body;
+
+  const loginEmail = (email || adminEmail || '').toString().trim();
+  const loginPassword = (password || adminPassword || '').toString();
+
 
   // Validation
-  if (!email || !password) {
+  if (!loginEmail || !loginPassword) {
     res.status(400);
     throw new Error('Please provide email and password');
   }
 
   // Check for user
-  const user = await User.findOne({ email: email.toLowerCase() });
+  const user = await User.findOne({
+    $or: [
+      { email: loginEmail.toLowerCase() },
+      { username: loginEmail },
+    ],
+  });
+
+
   if (!user) {
     res.status(401);
     throw new Error('Invalid credentials');
@@ -163,7 +183,8 @@ exports.login = asyncHandler(async (req, res) => {
 
 
   // Check if password matches
-  const isMatch = await user.matchPassword(password);
+  const isMatch = await user.matchPassword(loginPassword);
+
   if (!isMatch) {
     res.status(401);
     throw new Error('Invalid credentials');
