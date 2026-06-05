@@ -40,7 +40,7 @@ function generateAdminTotpSecret({ issuer, accountName }) {
 function verifyTotp({ secret, token, window = 1 }) {
   return speakeasy.totp.verify({
     secret: normalizeSecret(secret),
-    encoding: 'ascii',
+    encoding: 'base32',
     token: token.toString(),
     window,
   });
