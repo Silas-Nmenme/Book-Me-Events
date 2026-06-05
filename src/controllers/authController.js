@@ -144,16 +144,27 @@ exports.login = asyncHandler(async (req, res) => {
 
   // Defensive validation: prevent model-level “password is required” errors / Vercel 500s
   // when the client request arrives without a parsed JSON body.
-  if (!req.body || (password === undefined && adminPassword === undefined)) {
+  // NOTE: admin 2FA step may send only adminPassword/password fields.
+  if (!req.body) {
+    res.status(400);
+    throw new Error('Invalid login request body');
+  }
+
+  // Determine effective password.
+  // For admin 2FA flows, clients may send `password` with the admin password.
+  const effectivePassword = password ?? adminPassword;
+
+  if (effectivePassword === undefined) {
     if (process.env.NODE_ENV === 'production') {
       console.log('Login request missing password fields:', {
-        keys: req.body ? Object.keys(req.body) : [],
+        keys: Object.keys(req.body || {}),
       });
     }
 
     res.status(400);
     throw new Error('Password is required');
   }
+
 
   const loginEmail = (email || adminEmail || '').toString().trim();
   const loginPassword = (password || adminPassword || '').toString();
