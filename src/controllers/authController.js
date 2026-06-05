@@ -172,38 +172,38 @@ exports.login = asyncHandler(async (req, res) => {
   // Remove password from response
   user.password = undefined;
 
-  // Admin-enforced TOTP 2FA
-  // Requirement: Admin must enable TOTP before normal admin login proceeds.
+  // Admin 2FA flow
+  // Requirement:
+  // 1) If admin DOES NOT have 2FA enabled: allow login to proceed normally.
+  // 2) If admin HAS 2FA enabled: require totpCode and verify it.
   if (user.role === 'ADMIN') {
-    if (!user.totpEnabled || !user.totpSecret) {
-      res.status(403);
-      throw new Error('2FA required for admin accounts');
+    const has2fa = !!(user.totpEnabled && user.totpSecret);
+
+    if (has2fa) {
+      const { totpCode } = req.body;
+      if (!totpCode) {
+        res.status(403);
+        throw new Error('2FA code required');
+      }
+
+      const speakeasy = require('speakeasy');
+      const verified = speakeasy.totp.verify({
+        secret: user.totpSecret,
+        encoding: 'ascii',
+        token: totpCode.toString(),
+        window: 1,
+      });
+
+      if (!verified) {
+        res.status(401);
+        throw new Error('Invalid 2FA code');
+      }
+
+      user.totpVerifiedAt = new Date();
+      await user.save();
     }
-
-    // Expect totpCode in request body
-    const { totpCode } = req.body;
-    if (!totpCode) {
-      res.status(403);
-      throw new Error('2FA code required');
-    }
-
-    const speakeasy = require('speakeasy');
-
-    const verified = speakeasy.totp.verify({
-      secret: user.totpSecret,
-      encoding: 'ascii',
-      token: totpCode.toString(),
-      window: 1,
-    });
-
-    if (!verified) {
-      res.status(401);
-      throw new Error('Invalid 2FA code');
-    }
-
-    user.totpVerifiedAt = new Date();
-    await user.save();
   }
+
 
 
   // Generate token
