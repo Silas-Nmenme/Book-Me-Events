@@ -201,22 +201,46 @@ exports.login = asyncHandler(async (req, res) => {
     const has2fa = !!(user.totpEnabled && user.totpSecret);
 
     if (has2fa) {
-      const { totpCode } = req.body;
-      if (!totpCode) {
+      // Frontend uses `totpCode`, but accept a few common aliases to prevent hard-to-diagnose 500s.
+      const {
+        totpCode,
+        otp,
+        code,
+        totp,
+        adminTotpCode,
+      } = req.body || {};
+
+      const rawTotp = totpCode ?? otp ?? code ?? totp ?? adminTotpCode;
+
+      if (rawTotp === undefined || rawTotp === null || rawTotp === '') {
         res.status(403);
         throw new Error('2FA code required');
       }
 
       const speakeasy = require('speakeasy');
-      const verified = speakeasy.totp.verify({
-        // speakeasy expects the secret in base32 by default.
-        // If your secrets were generated using speakeasy, keep them as base32.
-        // If your secret is plain ascii, set encoding:'ascii'.
-        secret: user.totpSecret,
-        encoding: 'base32',
-        token: totpCode.toString(),
-        window: 1,
-      });
+
+      // Speakeasy expects base32 secret by default.
+      // Normalize token to digits-only; UI should send 6 digits.
+      const token = rawTotp.toString().replace(/\D/g, '');
+      if (!/^\d{6}$/.test(token)) {
+        res.status(400);
+        throw new Error(`Invalid 2FA code format`);
+      }
+
+      let verified;
+      try {
+        verified = speakeasy.totp.verify({
+          secret: user.totpSecret,
+          encoding: 'base32',
+          token,
+          window: 1,
+        });
+      } catch (err) {
+        // Avoid crashing the function (which surfaces as 500) if secret format is unexpected.
+        console.error('TOTP verify threw:', err?.message);
+        res.status(500);
+        throw new Error('2FA verification failed');
+      }
 
       if (!verified) {
         res.status(401);
