@@ -8,12 +8,11 @@
   /* Typography (recommended pairing)
      Body: Plus Jakarta Sans / DM Sans
      Headings: Clash Display / Syne
-     Note: loaded on pages that need them (or we can add global import later).
   */
   --font-body: "Plus Jakarta Sans", "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   --font-headings: "Syne", "Clash Display", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 
-  /* Color tokens */
+  /* Color tokens (semantic) */
   --color-primary: var(--brand);
   --color-accent: var(--brand2);
 
@@ -32,15 +31,10 @@
   --bg:#101827;
   --bg2:#121d33;
 
-  --card:rgba(255,255,255,.08);
-  --cardBorder:rgba(255,255,255,.14);
-
   --text: var(--color-text-primary);
   --mutedText: var(--color-text-muted);
 
-  --shadow: rgba(0,0,0,.28);
-
-  /* Forms / surfaces */
+  /* Surfaces & forms */
   --surface: rgba(18,26,47,.82);
   --surfaceBorder: rgba(255,255,255,.12);
 
@@ -49,8 +43,6 @@
   --inputText: var(--text);
   --inputPlaceholder: rgba(224,228,255,.56);
 
-  --link: #b9afff;
-
   color-scheme: dark;
 }
 
@@ -58,13 +50,8 @@
   --bg:#F2F5FF;
   --bg2:#E8EEFF;
 
-  --card: rgba(255,255,255,.86);
-  --cardBorder: rgba(15,23,42,.12);
-
   --text:#111827;
   --mutedText: rgba(17,24,39,.66);
-
-  --shadow: rgba(17,24,39,.12);
 
   --surface: rgba(255,255,255,.92);
   --surfaceBorder: rgba(15,23,42,.10);
@@ -73,8 +60,6 @@
   --inputBorder: rgba(17,24,39,.14);
   --inputText: var(--text);
   --inputPlaceholder: rgba(17,24,39,.48);
-
-  --link: #5b46ff;
 
   color-scheme: light;
 }
@@ -97,6 +82,7 @@ body{
               radial-gradient(900px 500px at 90% 20%, rgba(49,208,170,.08), transparent 50%),
               var(--bg);
 }
+
 
 /* Card elevation refresh */
 .card-glass,
@@ -218,48 +204,6 @@ body{
 
 
 /* Theme transition tuning */
-/* (Removed duplicated/invalid :root block that broke parsing) */
-
-
-:root[data-theme="light"]{
-  --bg:#F2F5FF;
-  --bg2:#E8EEFF;
-
-  --card: rgba(255,255,255,.86);
-  --cardBorder: rgba(15,23,42,.12);
-
-  --text:#111827;
-  --mutedText: rgba(17,24,39,.66);
-
-  --shadow: rgba(17,24,39,.12);
-
-  --surface: rgba(255,255,255,.92);
-  --surfaceBorder: rgba(15,23,42,.10);
-
-  --inputBg: rgba(17,24,39,.06);
-  --inputBorder: rgba(17,24,39,.14);
-  --inputText: var(--text);
-  --inputPlaceholder: rgba(17,24,39,.48);
-
-  --link: #5b46ff;
-
-  color-scheme: light;
-}
-
-
-body{
-  background: radial-gradient(1200px 600px at 10% 10%, rgba(124,92,255,.16), transparent 55%),
-              radial-gradient(900px 500px at 90% 20%, rgba(49,208,170,.12), transparent 50%),
-              var(--bg);
-  color:var(--text);
-}
-
-:root[data-theme="light"] body{
-  background: radial-gradient(1200px 600px at 10% 10%, rgba(124,92,255,.08), transparent 55%),
-              radial-gradient(900px 500px at 90% 20%, rgba(49,208,170,.08), transparent 50%),
-              var(--bg);
-}
-
 
 .navbar-glass,
 .card-glass{
@@ -271,6 +215,7 @@ body{
   background: var(--surface) !important;
   border: 1px solid var(--surfaceBorder) !important;
 }
+
 
 /* Ensure navbar does not overlap content: provide safe offset and stacking */
 .bme-navbar{

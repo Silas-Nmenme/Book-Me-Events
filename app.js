@@ -102,7 +102,11 @@ safeRoute('/api/v1/messages', require('./src/routes/messageRoutes'));
 safeRoute('/api/v1/admin', require('./src/routes/adminRegisterRoutes'));
 safeRoute('/api/v1/admin', require('./src/routes/adminRoutes'));
 
+// Dashboard analytics (user/vendor)
+safeRoute('/api/v1/dashboard', require('./src/routes/dashboardRoutes'));
+
 safeRoute('/api/v1/announcements', require('./src/routes/announcementRoutes'));
+
 
 safeRoute('/api/v1/uploads', require('./src/routes/uploadRoutes'));
 
