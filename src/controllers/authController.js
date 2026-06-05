@@ -209,8 +209,11 @@ exports.login = asyncHandler(async (req, res) => {
 
       const speakeasy = require('speakeasy');
       const verified = speakeasy.totp.verify({
+        // speakeasy expects the secret in base32 by default.
+        // If your secrets were generated using speakeasy, keep them as base32.
+        // If your secret is plain ascii, set encoding:'ascii'.
         secret: user.totpSecret,
-        encoding: 'ascii',
+        encoding: 'base32',
         token: totpCode.toString(),
         window: 1,
       });
@@ -224,6 +227,7 @@ exports.login = asyncHandler(async (req, res) => {
       await user.save();
     }
   }
+
 
 
 
