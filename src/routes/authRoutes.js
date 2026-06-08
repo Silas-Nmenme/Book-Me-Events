@@ -9,6 +9,7 @@ const {
   getMe,
   forgotPassword,
   resetPassword,
+  adminLoginOtp,
 } = require('../controllers/authController');
 
 // Public routes
@@ -16,6 +17,7 @@ router.post('/register', register);
 // Rate limiting is applied globally in app.js (for these endpoints).
 router.post('/verify-otp', express.json(), verifyOtp);
 router.post('/login', express.json(), login);
+router.post('/admin-login-otp', express.json(), adminLoginOtp);
 
 
 
