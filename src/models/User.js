@@ -8,11 +8,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true },
     phone: { type: String, unique: true, sparse: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['USER', 'VENDOR', 'ADMIN', 'admin'], default: 'USER' },
-
-    // Keep compatibility with existing code; admin two-step expects role === 'admin' / 'ADMIN'
-    // Frontend/backends should treat both as admin.
-
+    role: { type: String, enum: ['USER', 'VENDOR', 'ADMIN'], default: 'USER' },
     isVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     profilePicture: { type: String },
@@ -26,10 +22,11 @@ const userSchema = new mongoose.Schema(
     otpVerifiedAt: { type: Date },
 
     // TOTP 2FA (Admin enforced)
-    totpSecret: { type: String, required: true },
-    isTotpEnabled: { type: Boolean, default: true },
-    tempToken: { type: String, default: null },
-    tempTokenExpiry: { type: Date, default: null },
+    totpEnabled: { type: Boolean, default: false },
+    // For security, store the TOTP secret encrypted in a real app.
+    // Current scope stores plaintext secret because no encryption util exists.
+    totpSecret: { type: String },
+    totpVerifiedAt: { type: Date },
   },
 
   { timestamps: true }
