@@ -1,6 +1,5 @@
 const asyncHandler = require('express-async-handler');
 
-
 const User = require('../models/User');
 const { generateToken } = require('../utils/generateToken');
 const { sendEmail } = require('../utils/emailClient');
@@ -26,7 +25,7 @@ function otpExpiryMs() {
 // @route   POST /api/v1/auth/register
 // @access  Public
 exports.register = asyncHandler(async (req, res) => {
-  const { firstName, lastName, email, phone, password, passwordConfirm } = req.body;
+  const { firstName, lastName, email, phone, password, passwordConfirm } = req.body || {};
 
   // Validation
   if (!firstName || !lastName || !email || !phone || !password || !passwordConfirm) {
@@ -46,7 +45,6 @@ exports.register = asyncHandler(async (req, res) => {
     throw new Error('Email already registered');
   }
 
-  // Create user (role strictly USER)
   const user = await User.create({
     firstName,
     lastName,
@@ -67,8 +65,16 @@ exports.register = asyncHandler(async (req, res) => {
   // Send OTP email (best-effort)
   try {
     const subject = `Your ${process.env.APP_NAME || 'Book Me Events'} OTP verification code`;
-    const text = `Hi ${user.firstName},\n\nYour OTP code is: ${otp}\nThis code expires in ${Number(process.env.JWT_OTP_EXPIRE_MINUTES || 10)} minutes.\n`;
-    await sendEmail({ to: user.email, subject, text, html: `<p>${text.replace(/\n/g, '<br/>')}</p>` });
+    const text = `Hi ${user.firstName},\n\nYour OTP code is: ${otp}\nThis code expires in ${Number(
+      process.env.JWT_OTP_EXPIRE_MINUTES || 10,
+    )} minutes.\n`;
+
+    await sendEmail({
+      to: user.email,
+      subject,
+      text,
+      html: `<p>${text.replace(/\n/g, '<br/>')}</p>`,
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('OTP email failed:', err.message);
@@ -76,6 +82,7 @@ exports.register = asyncHandler(async (req, res) => {
 
   // Do not issue JWT until OTP verification.
   user.password = undefined;
+
   res.status(201).json({
     success: true,
     message: 'OTP sent to your email',
@@ -87,7 +94,8 @@ exports.register = asyncHandler(async (req, res) => {
 // @route   POST /api/v1/auth/verify-otp
 // @access  Public
 exports.verifyOtp = asyncHandler(async (req, res) => {
-  const { email, otp } = req.body;
+  const { email, otp } = req.body || {};
+
   if (!email || !otp) {
     res.status(400);
     throw new Error('Email and OTP are required');
@@ -126,62 +134,28 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: 'Email verified successfully' });
 });
 
-// @desc    Login user (requires OTP verified)
+// @desc    Login users/vendors/admins (ADMIN uses same endpoint; no OTP/TOTP)
 // @route   POST /api/v1/auth/login
 // @access  Public
 exports.login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body || {};
 
+  const loginEmail = (email || '').toString().trim();
+  const loginPassword = password === undefined || password === null ? undefined : password.toString();
 
-  // Admin + user can share the same login endpoint.
-  // Some admin login UIs may send admin-specific fields; normalize them.
-  const {
-    email,
-    password,
-    adminEmail,
-    adminPassword,
-    username,
-  } = req.body;
-
-  // Defensive validation: prevent model-level “password is required” errors / Vercel 500s
-  // when the client request arrives without a parsed JSON body.
-  // NOTE: admin 2FA step may send only adminPassword/password fields.
-  if (!req.body) {
-    res.status(400);
-    throw new Error('Invalid login request body');
-  }
-
-  // Determine effective password.
-  // For admin 2FA flows, clients may send `password` with the admin password.
-  const effectivePassword = password ?? adminPassword;
-
-  // IMPORTANT: Some model methods expect a string. Force to string if present.
-  const normalizedEffectivePassword =
-    effectivePassword === undefined || effectivePassword === null
-      ? undefined
-      : effectivePassword.toString();
-
-  const loginEmail = (email || adminEmail || '').toString().trim();
-
-  // ADMIN login must no longer accept TOTP/OTP continuation.
-  // Always require a password for /api/v1/auth/login.
-  // Admin email-OTP 2FA login must use:
-  //   POST /api/v1/admin/login/start-otp
-  //   POST /api/v1/admin/login/verify-otp
-  if (normalizedEffectivePassword === undefined) {
-    res.status(400);
-    throw new Error('Password is required');
-  }
-
-  const loginPassword = normalizedEffectivePassword;
-
-  // Validation
   if (!loginEmail) {
     res.status(400);
     throw new Error('Please provide email');
   }
 
+  if (!loginPassword || loginPassword.trim() === '') {
+    res.status(400);
+    throw new Error('Password is required');
+  }
 
-  // Check for user
+  // NOTE: OTP/TOTP removed for ADMIN login.
+  // Ignore any otp/totpCode fields; require password only.
+
   const user = await User.findOne({
     $or: [
       { email: loginEmail.toLowerCase() },
@@ -189,88 +163,33 @@ exports.login = asyncHandler(async (req, res) => {
     ],
   });
 
-
   if (!user) {
     res.status(401);
     throw new Error('Invalid credentials');
   }
 
   if (!user.isVerified) {
+    // users must verify email via OTP at registration time
     res.status(403);
-    throw new Error('Account not verified. Please verify your email OTP.');
+    throw new Error('Account not verified');
   }
 
-
-  // Debug: helps diagnose Vercel 500s during login
-  // (No sensitive data: only config state)
-  if (process.env.NODE_ENV === 'production') {
-    console.log('Login env check:', {
-      JWT_SECRET_present: !!process.env.JWT_SECRET,
-      DB_ready: !!global.__BME_DB_READY,
-    });
+  const isMatch = await user.matchPassword(loginPassword);
+  if (!isMatch) {
+    res.status(401);
+    throw new Error('Invalid credentials');
   }
 
-
-  // Check if password matches
-  if (loginPassword !== undefined) {
-    // Guard against empty-string passwords triggering model-level Mongoose validation errors.
-    // For ADMIN 2FA continuation requests, frontend should still send a real password.
-    if (typeof loginPassword !== 'string' || loginPassword.trim() === '') {
-      res.status(400);
-      throw new Error('Password is required');
-    }
-
-    const isMatch = await user.matchPassword(loginPassword);
-
-
-    if (!isMatch) {
-      res.status(401);
-      throw new Error('Invalid credentials');
-    }
-  }
-
-  // Remove password from response
   user.password = undefined;
-
-  // ADMIN 2FA/TOTP is intentionally NOT supported in this endpoint anymore.
-  // Admin login must use the dedicated email OTP endpoints.
-  // (If you call this endpoint with an admin account, the correct flow is to
-  //  first POST /api/v1/admin/login/start-otp.)
-  if (user.role === 'ADMIN') {
-    // If client attempts to pass TOTP/totpCode, reject explicitly.
-    const hasTotpCode = Boolean(
-      req.body &&
-        (req.body.totpCode ?? req.body.otp ?? req.body.code ?? req.body.totp ?? req.body.adminTotpCode)
-    );
-    if (hasTotpCode) {
-      res.status(403);
-      throw new Error('Use admin backend email OTP login flow');
-    }
-
-    // If admin has TOTP enabled, still do not accept it here.
-    if (user.totpEnabled && user.totpSecret) {
-      res.status(403);
-      throw new Error('2FA required');
-    }
-  }
-
-  // Generate token
 
   if (!process.env.JWT_SECRET) {
     res.status(500);
     throw new Error('Server misconfiguration: JWT_SECRET is missing');
   }
 
-  let token;
-  try {
-    token = generateToken(user._id);
-  } catch (err) {
-    res.status(500);
-    throw new Error(`Token generation failed: ${err.message}`);
-  }
+  const token = generateToken(user._id);
 
-
-  // Send login email (best-effort: don't fail login if email fails)
+  // Best-effort: don't fail login if email sending fails
   try {
     const { subject, text, html } = loginSuccessEmail({
       firstName: user.firstName,
@@ -295,7 +214,6 @@ exports.login = asyncHandler(async (req, res) => {
   });
 });
 
-
 // @desc    Logout user
 // @route   POST /api/v1/auth/logout
 // @access  Private
@@ -318,17 +236,12 @@ exports.getMe = asyncHandler(async (req, res) => {
   });
 });
 
-// NOTE: old JWT-link email verification removed.
-// Email verification is now OTP-based (see verifyOtp).
-
-
-
 // @desc    Forgot password
 // @route   POST /api/v1/auth/forgot-password
 // @access  Public
 exports.forgotPassword = asyncHandler(async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email } = req.body || {};
 
     if (!email) {
       res.status(400);
@@ -349,13 +262,11 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
     const crypto = require('crypto');
     const PasswordResetToken = require('../models/PasswordResetToken');
 
-    // Revoke any outstanding reset tokens for this user (keeps it revocable)
     await PasswordResetToken.updateMany(
       { userId: user._id, purpose: 'password_reset', revokedAt: null, usedAt: null },
       { $set: { revokedAt: new Date() } }
     );
 
-    // Create a random token and store only its hash
     const resetToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
 
@@ -370,25 +281,18 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
     });
 
     const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.app';
-    const resetUrl = `${FRONTEND_URL.replace(/\/+$/, '')}/reset-password.html?token=${encodeURIComponent(resetToken)}`;
-
-
-
+    const resetUrl = `${FRONTEND_URL.replace(/\/+$/, '')}/reset-password.html?token=${encodeURIComponent(
+      resetToken,
+    )}`;
 
     const { subject, text, html } = passwordResetRequestedEmail({
       firstName: user.firstName,
       resetLink: resetUrl,
     });
 
-
-    // Best-effort: don't fail the endpoint if email sending can't be configured.
+    // Best-effort
     try {
-      await sendEmail({
-        to: user.email,
-        subject,
-        text,
-        html,
-      });
+      await sendEmail({ to: user.email, subject, text, html });
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Password reset email failed:', err.message);
@@ -403,13 +307,11 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   }
 });
 
-
-
 // @desc    Reset password
 // @route   POST /api/v1/auth/reset-password/:token
 // @access  Public
 exports.resetPassword = asyncHandler(async (req, res) => {
-  const { password, passwordConfirm } = req.body;
+  const { password, passwordConfirm } = req.body || {};
 
   if (!password || !passwordConfirm) {
     res.status(400);
@@ -421,17 +323,14 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     throw new Error('Passwords do not match');
   }
 
-// DB-backed single-use password reset tokens
   const crypto = require('crypto');
   const PasswordResetToken = require('../models/PasswordResetToken');
-
 
   if (!req.params.token) {
     res.status(400);
     throw new Error('Reset token is required');
   }
 
-  // Hash the raw token using the same algorithm as in forgotPassword
   const tokenHash = crypto.createHash('sha256').update(req.params.token).digest('hex');
 
   const resetToken = await PasswordResetToken.findOne({ tokenHash }).populate('userId');
@@ -456,15 +355,12 @@ exports.resetPassword = asyncHandler(async (req, res) => {
     throw new Error('Invalid or expired reset token');
   }
 
-  // Update password
   const user = resetToken.userId;
   user.password = password;
   await user.save();
 
-  // Mark token as used (single-use)
   resetToken.usedAt = new Date();
   await resetToken.save();
-
 
   const { subject, text, html } = passwordResetSuccessEmail({ firstName: user.firstName });
 
