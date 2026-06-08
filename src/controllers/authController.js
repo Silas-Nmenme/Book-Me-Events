@@ -132,8 +132,19 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
 exports.login = asyncHandler(async (req, res) => {
 
 
-  // Admin + user can share the same login endpoint.
-  // Some admin login UIs may send admin-specific fields; normalize them.
+  // Guard: Admin must use dedicated admin 2-step login.
+  // If an admin account hits this endpoint, block it.
+  const loginEmailForAdminGuard = (req.body?.email || req.body?.adminEmail || '').toString().trim().toLowerCase();
+  if (loginEmailForAdminGuard) {
+    const maybeAdmin = await User.findOne({ email: loginEmailForAdminGuard });
+    if (maybeAdmin?.role === 'admin' || maybeAdmin?.role === 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admins must use the admin login flow',
+      });
+    }
+  }
+
   const {
     email,
     password,
