@@ -176,12 +176,7 @@ exports.login = asyncHandler(async (req, res) => {
   // Ensure we always use the validated password string for matching
   const loginPassword = normalizedEffectivePassword;
 
-
-
   const loginEmail = (email || adminEmail || '').toString().trim();
-  const loginPassword = (password || adminPassword || '').toString();
-
-
 
   // Validation
   if (!loginEmail || !loginPassword) {
