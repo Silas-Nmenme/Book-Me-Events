@@ -162,39 +162,17 @@ exports.login = asyncHandler(async (req, res) => {
 
   const loginEmail = (email || adminEmail || '').toString().trim();
 
-  // Validation
-  // For admin accounts with 2FA enabled, the first (password) step should include a password.
-  // However, the second (TOTP) step might only send totpCode + email.
-  // To keep the flow working, we allow missing password here for ADMIN when totpCode is present.
-  // The login will still fail with a clear 401/403 if password is truly missing when required.
-  const hasTotpInBody = !!(
-    (req.body &&
-      (req.body.totpCode ?? req.body.otp ?? req.body.code ?? req.body.totp ?? req.body.adminTotpCode))
-  );
-
+  // ADMIN login must no longer accept TOTP/OTP continuation.
+  // Always require a password for /api/v1/auth/login.
+  // Admin email-OTP 2FA login must use:
+  //   POST /api/v1/admin/login/start-otp
+  //   POST /api/v1/admin/login/verify-otp
   if (normalizedEffectivePassword === undefined) {
-    // If this looks like an admin TOTP-only continuation request, skip password matching.
-    // We will still generate the token after 2FA verification below.
-    // (But we must not call user.matchPassword with undefined.)
-    if (hasTotpInBody) {
-      // loginPassword stays undefined; handled later.
-    } else {
-      if (process.env.NODE_ENV === 'production') {
-        console.log('Login request missing password fields:', {
-          keys: Object.keys(req.body || {}),
-        });
-      }
-
-      res.status(400);
-      throw new Error('Password is required');
-    }
+    res.status(400);
+    throw new Error('Password is required');
   }
 
-  // Ensure we always use the validated password string for matching when provided.
   const loginPassword = normalizedEffectivePassword;
-
-  
-
 
   // Validation
   if (!loginEmail) {
@@ -233,7 +211,7 @@ exports.login = asyncHandler(async (req, res) => {
   }
 
 
-  // Check if password matches (unless this is an ADMIN 2FA continuation request)
+  // Check if password matches
   if (loginPassword !== undefined) {
     // Guard against empty-string passwords triggering model-level Mongoose validation errors.
     // For ADMIN 2FA continuation requests, frontend should still send a real password.
@@ -249,82 +227,35 @@ exports.login = asyncHandler(async (req, res) => {
       res.status(401);
       throw new Error('Invalid credentials');
     }
-  } else {
-    // No password provided. This is allowed only when ADMIN has 2FA enabled,
-    // and the client is continuing with a TOTP code.
-    if (!(user.role === 'ADMIN' && user.totpEnabled && user.totpSecret && req.body)) {
-      res.status(400);
-      throw new Error('Password is required');
-    }
   }
-
 
   // Remove password from response
   user.password = undefined;
 
-  // Admin 2FA flow
-  // Requirement:
-  // 1) If admin DOES NOT have 2FA enabled: allow login to proceed normally.
-  // 2) If admin HAS 2FA enabled: require totpCode and verify it.
+  // ADMIN 2FA/TOTP is intentionally NOT supported in this endpoint anymore.
+  // Admin login must use the dedicated email OTP endpoints.
+  // (If you call this endpoint with an admin account, the correct flow is to
+  //  first POST /api/v1/admin/login/start-otp.)
   if (user.role === 'ADMIN') {
-    const has2fa = !!(user.totpEnabled && user.totpSecret);
+    // If client attempts to pass TOTP/totpCode, reject explicitly.
+    const hasTotpCode = Boolean(
+      req.body &&
+        (req.body.totpCode ?? req.body.otp ?? req.body.code ?? req.body.totp ?? req.body.adminTotpCode)
+    );
+    if (hasTotpCode) {
+      res.status(403);
+      throw new Error('Use admin backend email OTP login flow');
+    }
 
-    if (has2fa) {
-      // Frontend uses `totpCode`, but accept a few common aliases to prevent hard-to-diagnose 500s.
-      const {
-        totpCode,
-        otp,
-        code,
-        totp,
-        adminTotpCode,
-      } = req.body || {};
-
-      const rawTotp = totpCode ?? otp ?? code ?? totp ?? adminTotpCode;
-
-      if (rawTotp === undefined || rawTotp === null || rawTotp === '') {
-        res.status(403);
-        throw new Error('2FA code required');
-      }
-
-      const speakeasy = require('speakeasy');
-
-      // Speakeasy expects base32 secret by default.
-      // Normalize token to digits-only; UI should send 6 digits.
-      const token = rawTotp.toString().replace(/\D/g, '');
-      if (!/^\d{6}$/.test(token)) {
-        res.status(400);
-        throw new Error(`Invalid 2FA code format`);
-      }
-
-      let verified;
-      try {
-        verified = speakeasy.totp.verify({
-          secret: user.totpSecret,
-          encoding: 'base32',
-          token,
-          window: 1,
-        });
-      } catch (err) {
-        // Avoid crashing the function (which surfaces as 500) if secret format is unexpected.
-        console.error('TOTP verify threw:', err?.message);
-        res.status(500);
-        throw new Error('2FA verification failed');
-      }
-
-      if (!verified) {
-        res.status(401);
-        throw new Error('Invalid 2FA code');
-      }
-
-      user.totpVerifiedAt = new Date();
-      await user.save();
+    // If admin has TOTP enabled, still do not accept it here.
+    if (user.totpEnabled && user.totpSecret) {
+      res.status(403);
+      throw new Error('2FA required');
     }
   }
 
-
-
-
   // Generate token
+
   if (!process.env.JWT_SECRET) {
     res.status(500);
     throw new Error('Server misconfiguration: JWT_SECRET is missing');
