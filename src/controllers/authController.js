@@ -160,29 +160,48 @@ exports.login = asyncHandler(async (req, res) => {
       ? undefined
       : effectivePassword.toString();
 
-  if (normalizedEffectivePassword === undefined) {
-    // In case we hit this, it means the client didn't send ANY password field.
-    // This used to cause a 500 deeper in matchPassword via a missing password.
-    if (process.env.NODE_ENV === 'production') {
-      console.log('Login request missing password fields:', {
-        keys: Object.keys(req.body || {}),
-      });
-    }
-
-    res.status(400);
-    throw new Error('Password is required');
-  }
-
-  // Ensure we always use the validated password string for matching
-  const loginPassword = normalizedEffectivePassword;
-
   const loginEmail = (email || adminEmail || '').toString().trim();
 
   // Validation
-  if (!loginEmail || !loginPassword) {
-    res.status(400);
-    throw new Error('Please provide email and password');
+  // For admin accounts with 2FA enabled, the first (password) step should include a password.
+  // However, the second (TOTP) step might only send totpCode + email.
+  // To keep the flow working, we allow missing password here for ADMIN when totpCode is present.
+  // The login will still fail with a clear 401/403 if password is truly missing when required.
+  const hasTotpInBody = !!(
+    (req.body &&
+      (req.body.totpCode ?? req.body.otp ?? req.body.code ?? req.body.totp ?? req.body.adminTotpCode))
+  );
+
+  if (normalizedEffectivePassword === undefined) {
+    // If this looks like an admin TOTP-only continuation request, skip password matching.
+    // We will still generate the token after 2FA verification below.
+    // (But we must not call user.matchPassword with undefined.)
+    if (hasTotpInBody) {
+      // loginPassword stays undefined; handled later.
+    } else {
+      if (process.env.NODE_ENV === 'production') {
+        console.log('Login request missing password fields:', {
+          keys: Object.keys(req.body || {}),
+        });
+      }
+
+      res.status(400);
+      throw new Error('Password is required');
+    }
   }
+
+  // Ensure we always use the validated password string for matching when provided.
+  const loginPassword = normalizedEffectivePassword;
+
+  
+
+
+  // Validation
+  if (!loginEmail) {
+    res.status(400);
+    throw new Error('Please provide email');
+  }
+
 
   // Check for user
   const user = await User.findOne({
@@ -214,13 +233,23 @@ exports.login = asyncHandler(async (req, res) => {
   }
 
 
-  // Check if password matches
-  const isMatch = await user.matchPassword(loginPassword);
+  // Check if password matches (unless this is an ADMIN 2FA continuation request)
+  if (loginPassword !== undefined) {
+    const isMatch = await user.matchPassword(loginPassword);
 
-  if (!isMatch) {
-    res.status(401);
-    throw new Error('Invalid credentials');
+    if (!isMatch) {
+      res.status(401);
+      throw new Error('Invalid credentials');
+    }
+  } else {
+    // No password provided. This is allowed only when ADMIN has 2FA enabled,
+    // and the client is continuing with a TOTP code.
+    if (!(user.role === 'ADMIN' && user.totpEnabled && user.totpSecret && req.body)) {
+      res.status(400);
+      throw new Error('Password is required');
+    }
   }
+
 
   // Remove password from response
   user.password = undefined;
