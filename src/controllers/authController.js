@@ -262,40 +262,62 @@ exports.login = asyncHandler(async (req, res) => {
   // Remove password from response
   user.password = undefined;
 
-  // Admin 2FA flow (EMAIL OTP instead of TOTP)
+  // Admin 2FA flow
   // Requirement:
   // 1) If admin DOES NOT have 2FA enabled: allow login to proceed normally.
-  // 2) If admin HAS 2FA enabled: do NOT verify TOTP here.
-  //    Instead, require a second step where we send + verify an OTP via email.
+  // 2) If admin HAS 2FA enabled: require totpCode and verify it.
   if (user.role === 'ADMIN') {
     const has2fa = !!(user.totpEnabled && user.totpSecret);
 
     if (has2fa) {
-      // Generate + email OTP, then force frontend to a dedicated step.
-      // We reuse the existing DB fields (otpCode/otpExpiresAt/otpPurpose) already used elsewhere.
-      const otp = generateSixDigitOtp();
-      user.otpCode = otp;
-      user.otpExpiresAt = new Date(Date.now() + otpExpiryMs());
-      user.otpPurpose = 'admin_login_otp';
-      user.otpVerifiedAt = undefined;
-      await user.save();
+      // Frontend uses `totpCode`, but accept a few common aliases to prevent hard-to-diagnose 500s.
+      const {
+        totpCode,
+        otp,
+        code,
+        totp,
+        adminTotpCode,
+      } = req.body || {};
 
-      try {
-        const subject = `Your ${process.env.APP_NAME || 'Book Me Events'} admin login OTP`;
-        const text = `Hi ${user.firstName},\n\nYour admin login OTP code is: ${otp}\nExpires in ${Number(process.env.JWT_OTP_EXPIRE_MINUTES || 10)} minutes.\n`;
-        await sendEmail({
-          to: user.email,
-          subject,
-          text,
-          html: `<p>${text.replace(/\n/g, '<br/>')}</p>`,
-        });
-      } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('Admin OTP email failed:', err.message);
+      const rawTotp = totpCode ?? otp ?? code ?? totp ?? adminTotpCode;
+
+      if (rawTotp === undefined || rawTotp === null || rawTotp === '') {
+        res.status(403);
+        throw new Error('2FA code required');
       }
 
-      res.status(403);
-      throw new Error('ADMIN_OTP_REQUIRED');
+      const speakeasy = require('speakeasy');
+
+      // Speakeasy expects base32 secret by default.
+      // Normalize token to digits-only; UI should send 6 digits.
+      const token = rawTotp.toString().replace(/\D/g, '');
+      if (!/^\d{6}$/.test(token)) {
+        res.status(400);
+        throw new Error(`Invalid 2FA code format`);
+      }
+
+      let verified;
+      try {
+        verified = speakeasy.totp.verify({
+          secret: user.totpSecret,
+          encoding: 'base32',
+          token,
+          window: 1,
+        });
+      } catch (err) {
+        // Avoid crashing the function (which surfaces as 500) if secret format is unexpected.
+        console.error('TOTP verify threw:', err?.message);
+        res.status(500);
+        throw new Error('2FA verification failed');
+      }
+
+      if (!verified) {
+        res.status(401);
+        throw new Error('Invalid 2FA code');
+      }
+
+      user.totpVerifiedAt = new Date();
+      await user.save();
     }
   }
 
@@ -452,94 +474,9 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
 
 
 
-// @desc    Admin login OTP verification
-// @route   POST /api/v1/auth/admin-login-otp
+// @desc    Reset password
+// @route   POST /api/v1/auth/reset-password/:token
 // @access  Public
-exports.adminLoginOtp = asyncHandler(async (req, res) => {
-  const { email, password, otpCode } = req.body || {};
-
-  if (!email || !password || !otpCode) {
-    res.status(400);
-    throw new Error('Email, password, and otpCode are required');
-  }
-
-  const loginEmail = email.toString().trim().toLowerCase();
-  const user = await User.findOne({
-    $or: [{ email: loginEmail }, { username: email }],
-  });
-
-  if (!user || user.role !== 'ADMIN') {
-    res.status(401);
-    throw new Error('Invalid credentials');
-  }
-
-  if (!user.isVerified) {
-    res.status(403);
-    throw new Error('Account not verified. Please verify your email OTP.');
-  }
-
-  // Verify password
-  if (typeof password !== 'string' || password.trim() === '') {
-    res.status(400);
-    throw new Error('Password is required');
-  }
-
-  const isMatch = await user.matchPassword(password.toString());
-  if (!isMatch) {
-    res.status(401);
-    throw new Error('Invalid credentials');
-  }
-
-  // Verify OTP
-  const normalizedOtp = otpCode.toString().replace(/\D/g, '');
-  if (!/^\d{6}$/.test(normalizedOtp)) {
-    res.status(400);
-    throw new Error('Invalid otpCode format');
-  }
-
-  if (!user.otpCode || !user.otpExpiresAt || user.otpPurpose !== 'admin_login_otp') {
-    res.status(403);
-    throw new Error('No admin OTP request found');
-  }
-
-  if (new Date() > user.otpExpiresAt) {
-    res.status(403);
-    throw new Error('OTP expired');
-  }
-
-  if (user.otpCode !== normalizedOtp) {
-    res.status(401);
-    throw new Error('Invalid OTP code');
-  }
-
-  user.otpVerifiedAt = new Date();
-  user.otpCode = undefined;
-  user.otpExpiresAt = undefined;
-  user.otpPurpose = undefined;
-  await user.save();
-
-  if (!process.env.JWT_SECRET) {
-    res.status(500);
-    throw new Error('Server misconfiguration: JWT_SECRET is missing');
-  }
-
-  let token;
-  try {
-    token = generateToken(user._id);
-  } catch (err) {
-    res.status(500);
-    throw new Error(`Token generation failed: ${err.message}`);
-  }
-
-  user.password = undefined;
-
-  res.status(200).json({
-    success: true,
-    data: user,
-    token,
-  });
-});
-
 exports.resetPassword = asyncHandler(async (req, res) => {
   const { password, passwordConfirm } = req.body;
 
