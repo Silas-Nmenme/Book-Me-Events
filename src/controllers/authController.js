@@ -235,7 +235,15 @@ exports.login = asyncHandler(async (req, res) => {
 
   // Check if password matches (unless this is an ADMIN 2FA continuation request)
   if (loginPassword !== undefined) {
+    // Guard against empty-string passwords triggering model-level Mongoose validation errors.
+    // For ADMIN 2FA continuation requests, frontend should still send a real password.
+    if (typeof loginPassword !== 'string' || loginPassword.trim() === '') {
+      res.status(400);
+      throw new Error('Password is required');
+    }
+
     const isMatch = await user.matchPassword(loginPassword);
+
 
     if (!isMatch) {
       res.status(401);
