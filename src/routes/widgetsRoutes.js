@@ -18,6 +18,7 @@ router.get('/stats/platform', getPlatformStats);
 router.get('/bookings/upcoming', protect, getUpcomingBookings);
 router.get('/payments/summary', protect, getPaymentsSummary);
 
+
 // Review nudge endpoint support
 router.get('/bookings', protect, (req, res, next) => {
   const { status, reviewed } = req.query;

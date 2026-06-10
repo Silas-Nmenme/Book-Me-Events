@@ -15,7 +15,10 @@ const {
 
 // Protected routes
 router.get('/', protect, getBookings);
+router.get('/upcoming', protect, (req, res, next) => next());
+
 router.get('/:id', protect, getBooking);
+
 
 // Create booking with input validation
 router.post(
