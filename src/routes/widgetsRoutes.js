@@ -31,6 +31,8 @@ router.get('/bookings', protect, (req, res, next) => {
 // Spec requires auth except activity-feed?public=true
 router.get('/activity-feed', protect, getActivityFeed);
 router.get('/messages/preview', protect, getMessagesPreview);
+router.get('/preview', protect, getMessagesPreview);
+
 
 // Vendors for map: spec is /api/v1/vendors?city=&category=&limit=
 router.get('/vendors', protect, getVendorsForMap);
