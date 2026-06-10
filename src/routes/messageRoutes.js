@@ -13,12 +13,21 @@ const {
   markAsRead,
 } = require('../controllers/messageController');
 
+const { getMessagesPreview } = require('../controllers/messagesPreviewController');
+
+
 
 // Protected routes
 router.get('/', protect, getMessages);
 router.get('/unread/count', protect, getUnreadCount);
 router.get('/conversation/:userId', protect, getConversation);
+router.get('/preview', protect, getMessagesPreview);
+
+
+// NOTE: keep ':id' after fixed string routes to avoid treating reserved path segments
 router.get('/:id', protect, getMessage);
+
+
 
 // Send message
 router.post('/', protect, sendMessage);
