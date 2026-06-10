@@ -12,11 +12,12 @@ const {
   completeBooking,
   deleteBooking,
 } = require('../controllers/bookingController');
+const { getUpcomingBookings } = require('../controllers/upcomingBookingsController');
 
 // Protected routes
 router.get('/', protect, getBookings);
-router.get('/upcoming', protect, (req, res, next) => next());
-
+// Explicit /upcoming endpoint to avoid "upcoming" being treated as :id.
+router.get('/upcoming', protect, getUpcomingBookings);
 router.get('/:id', protect, getBooking);
 
 
