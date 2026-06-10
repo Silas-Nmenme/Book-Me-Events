@@ -35,9 +35,14 @@ const vendorSchema = new mongoose.Schema(
 
     // Keep a pointer to the admin who last reviewed (optional)
     kycReviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+    // Geo coordinates for map pins (Leaflet)
+    lat: { type: Number },
+    lng: { type: Number },
   },
   { timestamps: true }
 );
+
 
 
 module.exports = mongoose.model('Vendor', vendorSchema);

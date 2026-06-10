@@ -106,10 +106,15 @@ safeRoute('/api/v1/admin', require('./src/routes/adminRoutes'));
 // Dashboard analytics (user/vendor)
 safeRoute('/api/v1/dashboard', require('./src/routes/dashboardRoutes'));
 
+// Platform/widget endpoints (match spec URLs)
+safeRoute('/api/v1', require('./src/routes/widgetsRoutes'));
+
+
 safeRoute('/api/v1/announcements', require('./src/routes/announcementRoutes'));
 
 
 safeRoute('/api/v1/uploads', require('./src/routes/uploadRoutes'));
+
 
 // USER MVP: activity, announcements read/unread, tickets
 safeRoute('/api/v1/users', require('./src/routes/userActivityRoutes'));
