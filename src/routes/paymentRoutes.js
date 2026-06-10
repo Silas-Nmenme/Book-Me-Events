@@ -13,12 +13,18 @@ const {
   createFlutterwavePayment,
 } = require('../controllers/paymentController');
 
+const { getPaymentsSummary } = require('../controllers/paymentsSummaryController');
+
+
 // Protected routes
 router.get('/', protect, getPayments);
 router.get('/ref/:ref', protect, getPaymentByRef);
 router.get('/stats/overview', protect, authorize('ADMIN'), getPaymentStats);
 
+router.get('/summary', protect, getPaymentsSummary);
+
 router.get('/:id', protect, getPayment);
+
 
 // Create payment (User only)
 router.post(
