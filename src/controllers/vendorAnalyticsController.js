@@ -22,23 +22,49 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
   ] = await Promise.all([
     Booking.countDocuments({ vendor: vendor._id }),
     Booking.countDocuments({ vendor: vendor._id, bookingStatus: 'COMPLETED' }),
+
+    // TOTAL REVENUE (harden amount coercion)
     Payment.aggregate([
       { $match: { vendor: vendor._id, paymentStatus: 'COMPLETED' } },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: { $ifNull: [{ $toDouble: '$amount' }, 0] } },
+        },
+      },
     ]),
+
+    // AVG RATING (harden rating coercion)
     Review.aggregate([
       { $match: { vendor: vendor._id } },
-      { $group: { _id: null, avg: { $avg: '$rating' } } },
+      {
+        $group: {
+          _id: null,
+          avg: { $avg: { $ifNull: [{ $toDouble: '$rating' }, 0] } },
+        },
+      },
     ]),
+
     Review.countDocuments({ vendor: vendor._id }),
+
+    // PAYMENTS BY METHOD (harden amount coercion)
     Payment.aggregate([
       { $match: { vendor: vendor._id, paymentStatus: 'COMPLETED' } },
-      { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$amount' } } },
+      {
+        $group: {
+          _id: '$paymentMethod',
+          count: { $sum: 1 },
+          total: { $sum: { $ifNull: [{ $toDouble: '$amount' }, 0] } },
+        },
+      },
     ]),
   ]);
 
-  const totalRevenue = totalRevenueAgg?.[0]?.total || 0;
-  const averageRating = avgRatingAgg?.[0]?.avg ? Number(avgRatingAgg[0].avg).toFixed(1) : '0.0';
+  const totalRevenue = Number(totalRevenueAgg?.[0]?.total ?? 0) || 0;
+  const avgRaw = avgRatingAgg?.[0]?.avg;
+  const averageRating = Number(avgRaw ?? 0);
+  const averageRatingRounded = Number.isFinite(averageRating) ? Number(averageRating.toFixed(1)) : 0;
+
 
   res.status(200).json({
     success: true,
@@ -47,7 +73,7 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
       totalBookings,
       completedBookings,
       totalRevenue,
-      averageRating: Number(averageRating),
+      averageRating: averageRatingRounded,
       totalReviews: reviewsCount,
       paymentsByMethod: paymentsByMethodAgg,
     },
