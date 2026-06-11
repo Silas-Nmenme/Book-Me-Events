@@ -121,6 +121,9 @@ safeRoute('/api/v1/users', require('./src/routes/userActivityRoutes'));
 safeRoute('/api/v1/announcements', require('./src/routes/announcementReadRoutes'));
 
 // VENDOR MVP: analytics/sla/tickets/promotions
+// IMPORTANT: mount analytics routes BEFORE generic vendor routes that use `/:id`
+// to avoid `/vendors/analytics` being treated as `/:id === "analytics"`.
+// This ordering matters for correct routing.
 safeRoute('/api/v1/vendors', require('./src/routes/vendorAnalyticsRoutes'));
 
 safeRoute('/api/v1/tickets', require('./src/routes/ticketRoutes'));

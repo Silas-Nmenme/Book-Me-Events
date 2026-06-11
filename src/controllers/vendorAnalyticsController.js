@@ -12,6 +12,14 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
     return res.status(401).json({ success: false, message: 'Unauthorized: missing user id' });
   }
 
+  // Mongoose CastErrors must be prevented.
+  // Some misrouted calls may cause `userId` to be a non-ObjectId string (e.g. "analytics").
+  const mongoose = require('mongoose');
+  if (!mongoose.Types.ObjectId.isValid(String(userId))) {
+    return res.status(401).json({ success: false, message: 'Unauthorized: invalid user id token' });
+  }
+
+
   const vendor = await Vendor.findOne({ user: userId });
   if (!vendor) {
     return res.status(403).json({ success: false, message: 'Vendor profile not found' });
