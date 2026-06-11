@@ -4,29 +4,27 @@ const ActivityLog = require('../models/ActivityLog');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 
+function getValidatedUserId(req) {
+  const userIdRaw = req?.user?.id ?? req?.user?._id ?? req?.user;
+  const userIdStr = typeof userIdRaw === 'string' ? userIdRaw : userIdRaw?.toString?.();
+  if (typeof userIdStr !== 'string' || !mongoose.Types.ObjectId.isValid(userIdStr)) return null;
+  return mongoose.Types.ObjectId(userIdStr);
+}
 
 // USER: activity feed
 exports.getMyActivity = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20 } = req.query;
   const safePage = Math.max(parseInt(page, 10) || 1, 1);
   const safeLimit = Math.max(parseInt(limit, 10) || 20, 1);
-
   const skip = (safePage - 1) * safeLimit;
 
-  // Guard against bad/incorrectly-injected req.user.id values (prevents ObjectId cast crash)
-  const userIdRaw = req?.user?.id ?? req?.user?._id ?? req?.user;
-  const userIdStr = typeof userIdRaw === 'string' ? userIdRaw : userIdRaw?.toString?.();
-  if (!userIdStr || !mongoose.Types.ObjectId.isValid(String(userIdStr))) {
+  const userId = getValidatedUserId(req);
+  if (!userId) {
     return res.status(401).json({
       success: false,
-      message: 'Invalid user context'
+      message: 'Invalid user context',
     });
   }
-  const userId = mongoose.Types.ObjectId(String(userIdStr));
-
-
-
-
 
   const items = await ActivityLog.find({ user: userId })
     .sort({ occurredAt: -1 })
@@ -45,20 +43,18 @@ exports.getMyActivity = asyncHandler(async (req, res) => {
   });
 });
 
-
 // USER: booking tracking timeline (derived MVP)
 exports.getMyBookingTracking = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20 } = req.query;
   const safePage = Math.max(parseInt(page, 10) || 1, 1);
   const safeLimit = Math.max(parseInt(limit, 10) || 20, 1);
-
   const skip = (safePage - 1) * safeLimit;
 
-  const userId = req?.user?.id;
-  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+  const userId = getValidatedUserId(req);
+  if (!userId) {
     return res.status(401).json({
       success: false,
-      message: 'Invalid user context'
+      message: 'Invalid user context',
     });
   }
 
@@ -89,7 +85,7 @@ exports.getMyBookingTracking = asyncHandler(async (req, res) => {
     };
   });
 
-  const total = await Booking.countDocuments({ user: req.user.id });
+  const total = await Booking.countDocuments({ user: userId });
 
   res.status(200).json({
     success: true,
