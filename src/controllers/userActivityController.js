@@ -14,13 +14,19 @@ exports.getMyActivity = asyncHandler(async (req, res) => {
   const skip = (safePage - 1) * safeLimit;
 
   // Guard against bad/incorrectly-injected req.user.id values (prevents ObjectId cast crash)
-  const userId = req?.user?.id;
-  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+  const userIdRaw = req?.user?.id ?? req?.user?._id ?? req?.user;
+  const userIdStr = typeof userIdRaw === 'string' ? userIdRaw : userIdRaw?.toString?.();
+  if (!userIdStr || !mongoose.Types.ObjectId.isValid(String(userIdStr))) {
     return res.status(401).json({
       success: false,
       message: 'Invalid user context'
     });
   }
+  const userId = mongoose.Types.ObjectId(String(userIdStr));
+
+
+
+
 
   const items = await ActivityLog.find({ user: userId })
     .sort({ occurredAt: -1 })

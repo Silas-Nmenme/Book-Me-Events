@@ -20,7 +20,26 @@ const protect = async (req, res, next) => {
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      const user = await User.findById(decoded.id).select('-password');
+      // decoded.id should be a Mongo ObjectId string; guard to avoid CastError (e.g. accidental "activity")
+      if (!decoded?.id || !User.schema.path('id')) {
+        // noop; keep structure
+      }
+
+      const userId = decoded?.id;
+      if (!userId || !User.base?.caster?.path) {
+        // fallback validation using mongoose directly
+      }
+
+      const mongoose = require('mongoose');
+      if (!mongoose.Types.ObjectId.isValid(String(userId))) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid user token'
+        });
+      }
+
+      const user = await User.findById(userId).select('-password');
+
 
       if (!user) {
         return res.status(401).json({
