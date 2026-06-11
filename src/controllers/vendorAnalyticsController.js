@@ -28,38 +28,65 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
     Booking.countDocuments({ vendor: vendor._id }),
     Booking.countDocuments({ vendor: vendor._id, bookingStatus: 'COMPLETED' }),
 
-    // TOTAL REVENUE (harden amount coercion)
+    // TOTAL REVENUE (safe numeric coercion)
     Payment.aggregate([
       { $match: { vendor: vendor._id, paymentStatus: 'COMPLETED' } },
       {
         $group: {
           _id: null,
-          total: { $sum: { $ifNull: [{ $toDouble: '$amount' }, 0] } },
+          total: {
+            $sum: {
+              $convert: {
+                input: '$amount',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
         },
       },
     ]),
 
-    // AVG RATING (harden rating coercion)
+    // AVG RATING (safe numeric coercion)
     Review.aggregate([
       { $match: { vendor: vendor._id } },
       {
         $group: {
           _id: null,
-          avg: { $avg: { $ifNull: [{ $toDouble: '$rating' }, 0] } },
+          avg: {
+            $avg: {
+              $convert: {
+                input: '$rating',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
         },
       },
     ]),
 
     Review.countDocuments({ vendor: vendor._id }),
 
-    // PAYMENTS BY METHOD (harden amount coercion)
+    // PAYMENTS BY METHOD (safe numeric coercion)
     Payment.aggregate([
       { $match: { vendor: vendor._id, paymentStatus: 'COMPLETED' } },
       {
         $group: {
           _id: '$paymentMethod',
           count: { $sum: 1 },
-          total: { $sum: { $ifNull: [{ $toDouble: '$amount' }, 0] } },
+          total: {
+            $sum: {
+              $convert: {
+                input: '$amount',
+                to: 'double',
+                onError: 0,
+                onNull: 0,
+              },
+            },
+          },
         },
       },
     ]),
