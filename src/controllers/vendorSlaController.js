@@ -8,7 +8,12 @@ const Request = require('../models/Request');
 // - Approximates breach using request age since createdAt for PENDING requests.
 // Note: If you later add ActivityLog-based transitions, we can tighten SLA accuracy.
 exports.getVendorSla = asyncHandler(async (req, res) => {
-  const vendor = await Vendor.findOne({ user: req.user.id });
+  const userId = req.user?._id || req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'Unauthorized: missing user id' });
+  }
+
+  const vendor = await Vendor.findOne({ user: userId });
   if (!vendor) {
     return res.status(403).json({ success: false, message: 'Vendor profile not found' });
   }
