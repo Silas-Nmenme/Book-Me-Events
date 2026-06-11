@@ -1,7 +1,9 @@
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 const ActivityLog = require('../models/ActivityLog');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
+
 
 // USER: activity feed
 exports.getMyActivity = asyncHandler(async (req, res) => {
@@ -11,12 +13,21 @@ exports.getMyActivity = asyncHandler(async (req, res) => {
 
   const skip = (safePage - 1) * safeLimit;
 
-  const items = await ActivityLog.find({ user: req.user.id })
+  // Guard against bad/incorrectly-injected req.user.id values (prevents ObjectId cast crash)
+  const userId = req?.user?.id;
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid user context'
+    });
+  }
+
+  const items = await ActivityLog.find({ user: userId })
     .sort({ occurredAt: -1 })
     .skip(skip)
     .limit(safeLimit);
 
-  const total = await ActivityLog.countDocuments({ user: req.user.id });
+  const total = await ActivityLog.countDocuments({ user: userId });
 
   res.status(200).json({
     success: true,
@@ -28,6 +39,7 @@ exports.getMyActivity = asyncHandler(async (req, res) => {
   });
 });
 
+
 // USER: booking tracking timeline (derived MVP)
 exports.getMyBookingTracking = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20 } = req.query;
@@ -36,7 +48,15 @@ exports.getMyBookingTracking = asyncHandler(async (req, res) => {
 
   const skip = (safePage - 1) * safeLimit;
 
-  const bookings = await Booking.find({ user: req.user.id })
+  const userId = req?.user?.id;
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid user context'
+    });
+  }
+
+  const bookings = await Booking.find({ user: userId })
     .populate('vendor')
     .populate('service')
     .populate('request')
