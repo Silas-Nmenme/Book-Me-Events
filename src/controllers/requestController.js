@@ -13,7 +13,8 @@ exports.getRequests = asyncHandler(async (req, res) => {
   let filter = {};
 
   if (status) {
-    filter.status = status;
+    // Frontend sends lowercase; DB stores uppercase.
+    filter.status = status.toString().toUpperCase();
   } else {
     filter.status = { $ne: 'BOOKED' };
   }
@@ -56,7 +57,7 @@ exports.getRequests = asyncHandler(async (req, res) => {
 exports.getRequest = asyncHandler(async (req, res) => {
   const request = await Request.findById(req.params.id)
     .populate('user', 'firstName lastName email phone profilePicture')
-.populate('vendor', 'businessName email phone user')
+    .populate('vendor', 'businessName email phone user')
     .populate('service');
 
   if (!request) {
@@ -79,6 +80,7 @@ exports.createRequest = asyncHandler(async (req, res) => {
     serviceId,
     // keep backwards compatibility with old UI
     service,
+
 
     eventDate,
     eventLocation,
