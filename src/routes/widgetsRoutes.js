@@ -10,9 +10,13 @@ const { getActivityFeed } = require('../controllers/activityFeedController');
 const { getMessagesPreview } = require('../controllers/messagesPreviewController');
 const { getVendorsForMap } = require('../controllers/vendorsForMapController');
 const { getCompletedUnreviewedBookings } = require('../controllers/reviewNudgeBookingController');
+const { getLandingVendorMarquee } = require('../controllers/landingVendorMarqueeController');
+
 
 // Public endpoints
 router.get('/stats/platform', getPlatformStats);
+router.get('/landing/vendor-marquee', getLandingVendorMarquee);
+
 
 // Authenticated widget endpoints
 router.get('/bookings/upcoming', protect, getUpcomingBookings);
