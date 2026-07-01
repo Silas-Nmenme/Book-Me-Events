@@ -473,17 +473,18 @@ exports.createFlutterwavePayment = async (req, res) => {
     }
 
     const redirectUrl = `${frontendUrl}/pages/bookings.html?bookingId=${booking._id}`;
-  
-  // FIX: Generate unique transaction reference for each initialization attempt
-  // This allows users to retry failed payments without unique constraint violations
-  const tx_ref = `BOOK_${booking._id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-  let payment = await Payment.findOne({ booking: booking._id, paymentStatus: 'PENDING', paymentGateway: 'FLUTTERWAVE' });
+    // FIX: Generate unique transaction reference for each initialization attempt
+    // This allows users to retry failed payments without unique constraint violations
+    const tx_ref = `BOOK_${booking._id}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
-  if (!payment) {
-    // Create new PENDING payment
-    payment = await Payment.create({
-      booking: booking._id,
+    let payment = await Payment.findOne({ booking: booking._id, paymentStatus: 'PENDING', paymentGateway: 'FLUTTERWAVE' });
+
+    if (!payment) {
+      // Create new PENDING payment
+      payment = await Payment.create({
+        booking: booking._id,
+
       user: req.user.id,
       vendor: booking.vendor._id,
       amount,
@@ -508,7 +509,8 @@ exports.createFlutterwavePayment = async (req, res) => {
     );
   }
 
-  await Booking.findByIdAndUpdate(bookingId, { paymentStatus: 'PENDING' });
+    await Booking.findByIdAndUpdate(bookingId, { paymentStatus: 'PENDING' });
+
 
     const payload = {
       tx_ref,
@@ -750,16 +752,19 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
       {
         paymentStatus: 'COMPLETED',
         // Only transition PENDING -> CONFIRMED; don't override other states
-        $cond: [
-          { $eq: ['$bookingStatus', 'PENDING'] },
-          'CONFIRMED',
-          '$bookingStatus'
-        ]
+        bookingStatus: {
+          $cond: [
+            { $eq: ['$bookingStatus', 'PENDING'] },
+            'CONFIRMED',
+            '$bookingStatus'
+          ]
+        },
       },
       { new: true }
-      .populate('user', 'firstName lastName email')
-      .populate({ path: 'vendor', populate: { path: 'user', select: 'firstName lastName email' } })
-      .populate('service');
+    ).populate('user', 'firstName lastName email')
+     .populate({ path: 'vendor', populate: { path: 'user', select: 'firstName lastName email' } })
+     .populate('service');
+
 
     // Re-fetch with proper population if atomic update didn't work as expected
     let finalBooking = updatedBooking;

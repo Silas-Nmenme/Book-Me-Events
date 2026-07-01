@@ -358,10 +358,11 @@ function vendorVerificationSuccessEmail({ recipientName, vendorBusinessName }) {
     <div style="font-size:14px;font-weight:900;color:#0f172a;margin:0 0 10px;">Account details</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:14px;overflow:hidden;">
       ${buildKeyValueRows([
-        { label: 'Business name', value: safeVendorBusinessBusinessNameHack(safeVendorBusinessName) },
+        { label: 'Business name', value: safeVendorBusinessName },
         { label: 'Status', value: 'Verified and ready' },
       ])}
     </table>
+
 
     <div style="padding-top:14px;font-size:13px;line-height:1.7;color:#475569;font-family:DM Sans, Arial, Helvetica, sans-serif;">
       Visit your vendor dashboard to manage services, pricing and new bookings.
