@@ -16,6 +16,10 @@ const {
 
 const app = express();
 
+if (!process.env.FLW_WEBHOOK_SECRET) {
+  console.warn('[Flutterwave] WARNING: FLW_WEBHOOK_SECRET is not set. Webhook signature verification will fail until this environment variable is configured.');
+}
+
 // Security headers (Helmet)
 app.use(...securityHeaders);
 
@@ -23,16 +27,13 @@ app.use(...securityHeaders);
  * ===== CORE MIDDLEWARE =====
  */
 // Flutterwave webhook endpoint. Mount it before the JSON body parser.
-try {
-  const flutterwaveWebhookHandler = require('./src/routes/paymentWebhook');
-  app.post('/payment/webhook/flutterwave', express.raw({ type: 'application/json' }), flutterwaveWebhookHandler);
-  app.post('/api/payment/webhook/flutterwave', express.raw({ type: 'application/json' }), flutterwaveWebhookHandler);
-  app.post('/v1/payments/webhook/flutterwave', express.raw({ type: 'application/json' }), flutterwaveWebhookHandler);
-  app.post('/api/v1/payments/webhook/flutterwave', express.raw({ type: 'application/json' }), flutterwaveWebhookHandler);
-  console.log('Loaded raw webhook routes: /payment/webhook/flutterwave, /api/payment/webhook/flutterwave, /v1/payments/webhook/flutterwave, /api/v1/payments/webhook/flutterwave');
-} catch (err) {
-  console.error('Failed to mount Flutterwave webhook route:', err?.message || err);
-}
+const flutterwaveWebhookHandler = require('./src/routes/paymentWebhook');
+app.post(
+  '/api/v1/payments/webhook/flutterwave',
+  express.raw({ type: 'application/json' }),
+  flutterwaveWebhookHandler
+);
+console.log('Mounted Flutterwave webhook route: POST /api/v1/payments/webhook/flutterwave');
 
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));

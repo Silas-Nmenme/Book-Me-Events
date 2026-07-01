@@ -7,22 +7,42 @@ const {
   vendorPaymentNotificationEmail,
 } = require('../utils/emailTemplates');
 
-const verifyFlutterwaveSignature = (rawBody, signature, secret) => {
-  if (!signature || !secret || !rawBody) {
+const verifyFlutterwaveSignature = (rawBody, headerName, signature, secret) => {
+  if (!signature || !secret || !rawBody || !headerName) {
     return false;
   }
 
   const headerSig = Array.isArray(signature) ? signature[0] : signature;
-  const computedSig = crypto
-    .createHmac('sha256', secret)
-    .update(rawBody, 'utf8')
-    .digest('hex');
+  if (typeof headerSig !== 'string' || !headerSig) {
+    return false;
+  }
 
   try {
-    return crypto.timingSafeEqual(
-      Buffer.from(computedSig, 'utf8'),
-      Buffer.from(headerSig, 'utf8')
-    );
+    const normalizedName = (headerName || '').toLowerCase();
+
+    if (normalizedName === 'verif-hash' || normalizedName === 'x-verification-hash') {
+      const expected = Buffer.from(secret, 'utf8');
+      const actual = Buffer.from(headerSig, 'utf8');
+      if (expected.length !== actual.length) {
+        return false;
+      }
+      return crypto.timingSafeEqual(expected, actual);
+    }
+
+    if (normalizedName === 'flutterwave-signature' || normalizedName === 'x-flutterwave-signature') {
+      const expected = crypto
+        .createHmac('sha256', secret)
+        .update(rawBody, 'utf8')
+        .digest('base64');
+      const actual = Buffer.from(headerSig, 'utf8');
+      const computed = Buffer.from(expected, 'utf8');
+      if (computed.length !== actual.length) {
+        return false;
+      }
+      return crypto.timingSafeEqual(computed, actual);
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -522,13 +542,25 @@ exports.createFlutterwavePayment = async (req, res) => {
  */
 exports.handleFlutterwaveWebhook = async (req, res) => {
   try {
+    console.log('[FlutterwaveWebhook] request received', {
+      path: req.originalUrl,
+      headers: req.headers,
+      bodyLength: typeof req.body === 'string'
+        ? req.body.length
+        : Buffer.isBuffer(req.body)
+          ? req.body.length
+          : req.body
+            ? JSON.stringify(req.body).length
+            : 0,
+    });
+
     const webhookSecret = process.env.FLW_WEBHOOK_SECRET;
-    const signature =
-      req.headers['verif-hash'] ||
-      req.headers['verificationhash'] ||
-      req.headers['verificationsignature'] ||
-      req.headers['x-flutterwave-signature'] ||
-      req.headers['x-verification-hash'];
+    const signatureHeaderName = req.headers['verif-hash'] || req.headers['x-verification-hash']
+      ? 'verif-hash'
+      : (req.headers['flutterwave-signature'] || req.headers['x-flutterwave-signature'])
+        ? 'flutterwave-signature'
+        : null;
+    const signature = req.headers['verif-hash'] || req.headers['x-verification-hash'] || req.headers['flutterwave-signature'] || req.headers['x-flutterwave-signature'];
 
     if (!webhookSecret) {
       console.error('FLW_WEBHOOK_SECRET missing; cannot verify Flutterwave webhook.');
@@ -536,8 +568,8 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
       return res.status(200).json({ received: true, error: 'Webhook secret not configured' });
     }
 
-    if (!signature) {
-      console.warn('Missing webhook signature');
+    if (!signatureHeaderName || !signature) {
+      console.warn('Missing webhook signature', { signatureHeaderName });
       // FIX: Return 200 with acknowledged response instead of 401
       return res.status(200).json({ received: true, error: 'Missing webhook signature' });
     }
@@ -556,8 +588,8 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
       rawText = JSON.stringify(rawBody);
     }
 
-    if (!verifyFlutterwaveSignature(rawText, signature, webhookSecret)) {
-      console.error('Invalid Flutterwave webhook signature', { signature, rawTextLength: rawText.length });
+    if (!verifyFlutterwaveSignature(rawText, signatureHeaderName, signature, webhookSecret)) {
+      console.error('Invalid Flutterwave webhook signature', { signatureHeaderName, signature, rawTextLength: rawText.length });
       // FIX: Return 200 with acknowledged response instead of 401
       return res.status(200).json({ received: true, error: 'Invalid webhook signature' });
     }
