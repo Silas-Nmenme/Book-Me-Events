@@ -61,22 +61,35 @@ const initiateFlutterwavePaymentRequest = async (payload) => {
     throw new Error('Fetch API not available on this server environment. Use Node 18+ or install a fetch polyfill.');
   }
 
-  const response = await fetchClient(FLUTTERWAVE_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${secretKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
 
-  const data = await response.json().catch(() => null);
-  if (!response.ok || data?.status !== 'success') {
-    const message = data?.message || data?.status || 'Failed to initialize Flutterwave payment';
-    throw new Error(message);
+  try {
+    const response = await fetchClient(FLUTTERWAVE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${secretKey}`,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok || data?.status !== 'success') {
+      const message = data?.message || data?.status || 'Failed to initialize Flutterwave payment';
+      throw new Error(message);
+    }
+
+    return data;
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('Flutterwave timed out while preparing checkout. Please try again in a moment.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return data;
 };
 
 /**
