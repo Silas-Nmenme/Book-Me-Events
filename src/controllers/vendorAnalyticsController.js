@@ -3,6 +3,7 @@ const Vendor = require('../models/Vendor');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const Review = require('../models/Review');
+const Request = require('../models/Request');
 
 // VENDOR: analytics derived from existing domain models.
 // Keeps MVP minimal: no persistence, just computed views.
@@ -27,6 +28,9 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
     const [
       totalBookings,
       completedBookings,
+      pendingBookings,
+      incomingRequests,
+      acceptedRequests,
       totalRevenueAgg,
       avgRatingAgg,
       reviewsCount,
@@ -34,66 +38,32 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
     ] = await Promise.all([
       Booking.countDocuments({ vendor: vendor._id }),
       Booking.countDocuments({ vendor: vendor._id, bookingStatus: 'COMPLETED' }),
+      Booking.countDocuments({
+        vendor: vendor._id,
+        bookingStatus: { $in: ['CONFIRMED', 'IN_PROGRESS'] },
+      }),
+      Request.countDocuments({ vendor: vendor._id, status: 'PENDING' }),
+      Request.countDocuments({ vendor: vendor._id, status: 'ACCEPTED' }),
 
-      // TOTAL REVENUE (safe numeric coercion)
       Payment.aggregate([
         { $match: { vendor: vendor._id, paymentStatus: 'COMPLETED' } },
-        {
-          $group: {
-            _id: null,
-            total: {
-              $sum: {
-                $convert: {
-                  input: '$amount',
-                  to: 'double',
-                  onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
-          },
-        },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
 
-      // AVG RATING (safe numeric coercion)
       Review.aggregate([
         { $match: { vendor: vendor._id } },
-        {
-          $group: {
-            _id: null,
-            avg: {
-              $avg: {
-                $convert: {
-                  input: '$rating',
-                  to: 'double',
-                  onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
-          },
-        },
+        { $group: { _id: null, avg: { $avg: '$rating' } } },
       ]),
 
       Review.countDocuments({ vendor: vendor._id }),
 
-      // PAYMENTS BY METHOD (safe numeric coercion)
       Payment.aggregate([
         { $match: { vendor: vendor._id, paymentStatus: 'COMPLETED' } },
         {
           $group: {
             _id: '$paymentMethod',
             count: { $sum: 1 },
-            total: {
-              $sum: {
-                $convert: {
-                  input: '$amount',
-                  to: 'double',
-                  onError: 0,
-                  onNull: 0,
-                },
-              },
-            },
+            total: { $sum: '$amount' },
           },
         },
       ]),
@@ -110,6 +80,9 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
         vendor: vendor._id,
         totalBookings,
         completedBookings,
+        pendingBookings,
+        incomingRequests,
+        acceptedRequests,
         totalRevenue,
         averageRating: averageRatingRounded,
         totalReviews: reviewsCount,
