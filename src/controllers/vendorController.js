@@ -4,6 +4,7 @@ const Service = require('../models/Service');
 const User = require('../models/User');
 const { sendEmail } = require('../utils/emailClient');
 const {
+  otpVerificationEmail,
   vendorVerificationRequestedEmail,
   adminNewVendorApprovalRequestEmail,
 } = require('../utils/emailTemplates');
@@ -22,15 +23,19 @@ function otpExpiryMs() {
 
 async function sendVendorOtpEmail({ user }) {
   const otp = user.otpCode;
-  const subject = `Your ${process.env.APP_NAME || 'Book Me Events'} OTP verification code`;
-  const text = `Hi ${user.firstName},\n\nYour OTP code is: ${otp}\nThis code expires in ${Number(process.env.JWT_OTP_EXPIRE_MINUTES || 10)} minutes.\n`;
+  const { subject, text, html } = otpVerificationEmail({
+    firstName: user.firstName,
+    otpCode: otp,
+    expiresInMinutes: Number(process.env.JWT_OTP_EXPIRE_MINUTES || 10),
+    purposeLabel: 'vendor account verification',
+  });
 
   // best-effort
   await sendEmail({
     to: user.email,
     subject,
     text,
-    html: `<p>${text.replace(/\n/g, '<br/>')}</p>`,
+    html,
   });
 }
 

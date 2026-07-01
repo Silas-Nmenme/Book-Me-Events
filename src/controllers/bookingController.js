@@ -85,8 +85,8 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
   // Get request details
   const serviceRequest = await Request.findById(request)
-    .populate('vendor')
-    .populate('service');
+    .populate('vendor', 'businessName user')
+    .populate('service', 'serviceName name');
 
   if (!serviceRequest) {
     res.status(404);
@@ -155,7 +155,8 @@ exports.createBooking = asyncHandler(async (req, res) => {
       vendorName,
       serviceName,
       bookingDate: eventDate,
-      bookingTime: booking?.eventTime || booking?.eventTimeSlot || '',
+      bookingTime: booking?.eventTime || booking?.eventTimeSlot || 'TBD',
+      bookingUrl: `${process.env.FRONTEND_URL || process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${booking._id}`,
     });
 
     if (bookingUser?.email) {

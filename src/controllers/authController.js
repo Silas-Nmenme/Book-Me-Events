@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { generateToken } = require('../utils/generateToken');
 const { sendEmail } = require('../utils/emailClient');
 const {
+  otpVerificationEmail,
   passwordResetRequestedEmail,
   passwordResetSuccessEmail,
   loginSuccessEmail,
@@ -62,18 +63,20 @@ exports.register = asyncHandler(async (req, res) => {
   user.otpVerifiedAt = undefined;
   await user.save();
 
-  // Send OTP email (best-effort)
+  // Send verification email (best-effort)
   try {
-    const subject = `Your ${process.env.APP_NAME || 'Book Me Events'} OTP verification code`;
-    const text = `Hi ${user.firstName},\n\nYour OTP code is: ${otp}\nThis code expires in ${Number(
-      process.env.JWT_OTP_EXPIRE_MINUTES || 10,
-    )} minutes.\n`;
+    const { subject, text, html } = otpVerificationEmail({
+      firstName: user.firstName,
+      otpCode: otp,
+      expiresInMinutes: Number(process.env.JWT_OTP_EXPIRE_MINUTES || 10),
+      purposeLabel: 'account verification',
+    });
 
     await sendEmail({
       to: user.email,
       subject,
       text,
-      html: `<p>${text.replace(/\n/g, '<br/>')}</p>`,
+      html,
     });
   } catch (err) {
     // eslint-disable-next-line no-console

@@ -198,8 +198,9 @@ exports.createPayment = async (req, res) => {
     } = req.body;
 
     const bookingData = await Booking.findById(booking)
-      .populate('user')
-      .populate('vendor');
+      .populate('user', 'firstName lastName email')
+      .populate({ path: 'vendor', populate: { path: 'user', select: 'firstName lastName email' } })
+      .populate('service');
 
     if (!bookingData) {
       return res.status(404).json({
@@ -238,7 +239,7 @@ exports.createPayment = async (req, res) => {
         currency: bookingData.amountCurrency || 'NGN',
         paymentMethod,
         transactionReference,
-        bookingDate: bookingData.eventDate?.toDateString?.() || bookingData.eventDate,
+        bookingDate: bookingData.eventDate,
         serviceName: bookingData.service?.name || bookingData.service?.serviceName || 'Service',
         vendorName: bookingData.vendor?.businessName || bookingData.vendor?.name || 'Vendor',
         bookingUrl: `${process.env.FRONTEND_URL || process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${bookingData._id}`,
@@ -261,7 +262,7 @@ exports.createPayment = async (req, res) => {
         currency: bookingData.amountCurrency || 'NGN',
         paymentMethod,
         transactionReference,
-        bookingDate: bookingData.eventDate?.toDateString?.() || bookingData.eventDate,
+        bookingDate: bookingData.eventDate,
         serviceName: bookingData.service?.name || bookingData.service?.serviceName || 'Service',
         customerName: `${bookingData.user?.firstName || ''} ${bookingData.user?.lastName || ''}`.trim() || bookingData.user?.email || 'Customer',
         bookingUrl: `${process.env.FRONTEND_URL || process.env.CLIENT_URL || ''}/Frontend/pages/bookings.html?bookingId=${bookingData._id}`,
@@ -756,7 +757,9 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
         ]
       },
       { new: true }
-    ).populate('user').populate('vendor').populate('service');
+      .populate('user', 'firstName lastName email')
+      .populate({ path: 'vendor', populate: { path: 'user', select: 'firstName lastName email' } })
+      .populate('service');
 
     // Re-fetch with proper population if atomic update didn't work as expected
     let finalBooking = updatedBooking;
@@ -782,7 +785,7 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
         currency: flutterwaveCurrency,
         paymentMethod,
         transactionReference: reference,
-        bookingDate: finalBooking.eventDate?.toDateString?.() || finalBooking.eventDate,
+        bookingDate: finalBooking.eventDate,
         serviceName: finalBooking.service?.name || finalBooking.service?.serviceName || 'Service',
         vendorName: finalBooking.vendor?.businessName || finalBooking.vendor?.name || 'Vendor',
         bookingUrl,
@@ -808,14 +811,14 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
         currency: flutterwaveCurrency,
         paymentMethod,
         transactionReference: reference,
-        bookingDate: finalBooking.eventDate?.toDateString?.() || finalBooking.eventDate,
+        bookingDate: finalBooking.eventDate,
         serviceName: finalBooking.service?.name || finalBooking.service?.serviceName || 'Service',
         customerName: `${finalBooking.user?.firstName || ''} ${finalBooking.user?.lastName || ''}`.trim() || finalBooking.user?.email || 'Customer',
         bookingUrl,
       });
-      if (finalBooking.vendor?.email) {
+      if (finalBooking.vendor?.user?.email) {
         await sendEmail({
-          to: finalBooking.vendor.email,
+          to: finalBooking.vendor.user.email,
           subject: vendorNotification.subject,
           text: vendorNotification.text,
           html: vendorNotification.html,

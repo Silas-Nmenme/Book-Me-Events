@@ -94,14 +94,15 @@ const sendEmail = async ({ to, subject, text, html } = {}) => {
     throw new Error('Missing email subject');
   }
 
-  const from = process.env.SMTP_FROM || process.env.MAIL_USER || process.env.EMAIL_FROM;
+  const from = process.env.SMTP_FROM || process.env.MAIL_USER || process.env.EMAIL_FROM || `no-reply@${process.env.APP_DOMAIN || 'bookmeevent.com'}`;
+  const safeText = text || (html ? html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : '');
 
   try {
     await t.sendMail({
-      from: from || undefined,
+      from,
       to,
       subject,
-      text,
+      text: safeText,
       html,
     });
 
