@@ -1,5 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Service = require('../models/Service');
+const { validatePagination, validatePositiveNumber, sanitizeString } = require('../utils/inputValidator');
+const { isServiceOwner } = require('../utils/authorizationHelper');
 
 // @desc    Get all services
 // @route   GET /api/v1/services
@@ -7,9 +9,17 @@ const Service = require('../models/Service');
 exports.getServices = asyncHandler(async (req, res) => {
   const { category, search, featured, page = 1, limit = 10 } = req.query;
 
+  // Validate pagination
+  const paginationVal = validatePagination(page, limit, 50);
+  if (!paginationVal.valid) {
+    res.status(400);
+    throw new Error(paginationVal.error);
+  }
+  const { page: pageNum, limit: limitNum } = paginationVal.value;
+
   let filter = { availabilityStatus: 'AVAILABLE' };
 
-  if (category) {
+  if (category && typeof category === 'string') {
     filter.serviceCategory = { $regex: category, $options: 'i' };
   }
 
@@ -17,19 +27,20 @@ exports.getServices = asyncHandler(async (req, res) => {
     filter.isFeatured = true;
   }
 
-  if (search) {
+  if (search && typeof search === 'string' && search.trim().length > 0) {
+    const sanitizedSearch = sanitizeString(search).substring(0, 100); // Max 100 chars
     filter.$or = [
-      { serviceName: { $regex: search, $options: 'i' } },
-      { description: { $regex: search, $options: 'i' } },
+      { serviceName: { $regex: sanitizedSearch, $options: 'i' } },
+      { description: { $regex: sanitizedSearch, $options: 'i' } },
     ];
   }
 
-  const skip = (page - 1) * limit;
+  const skip = (pageNum - 1) * limitNum;
 
   const services = await Service.find(filter)
     .populate('vendor', 'businessName rating')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: -1 });
 
   const total = await Service.countDocuments(filter);
@@ -38,8 +49,8 @@ exports.getServices = asyncHandler(async (req, res) => {
     success: true,
     count: services.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: services,
   });
 });
@@ -114,12 +125,21 @@ exports.createService = asyncHandler(async (req, res) => {
     throw new Error('Your vendor account is not verified by admin yet. Services are locked until verification.');
   }
 
+  // Validate basePrice if provided
+  if (basePrice !== undefined && basePrice !== null) {
+    const priceVal = validatePositiveNumber(basePrice, 'basePrice', 1000000);
+    if (!priceVal.valid) {
+      res.status(400);
+      throw new Error(priceVal.error);
+    }
+  }
+
   const service = await Service.create({
 
     vendor: vendor._id,
-    serviceName,
-    serviceCategory,
-    description,
+    serviceName: serviceName ? sanitizeString(serviceName).substring(0, 200) : undefined,
+    serviceCategory: serviceCategory ? sanitizeString(serviceCategory).substring(0, 100) : undefined,
+    description: description ? sanitizeString(description).substring(0, 2000) : undefined,
     basePrice,
     priceCurrency,
     images: finalImages,

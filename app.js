@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 
+const { validateEnvironment } = require('./src/utils/configValidator');
 const { errorHandler } = require('./src/middlewares/errorMiddleware');
 const { securityHeaders } = require('./src/middlewares/securityHeaders');
 const {
@@ -14,11 +15,15 @@ const {
   resetPasswordLimiter,
 } = require('./src/middlewares/rateLimiters');
 
-const app = express();
-
-if (!process.env.FLW_WEBHOOK_SECRET) {
-  console.warn('[Flutterwave] WARNING: FLW_WEBHOOK_SECRET is not set. Webhook signature verification will fail until this environment variable is configured.');
+// Validate environment at startup
+try {
+  validateEnvironment();
+} catch (err) {
+  console.error('❌ Startup failed:', err.message);
+  process.exit(1);
 }
+
+const app = express();
 
 // Security headers (Helmet)
 app.use(...securityHeaders);

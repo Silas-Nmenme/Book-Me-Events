@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/authMiddleware');
 const { upload } = require('../middlewares/uploadMiddleware');
+const { apiLimiter, uploadLimiter } = require('../middlewares/rateLimiters');
 const {
   getServices,
   getService,
@@ -10,13 +11,13 @@ const {
   deleteService,
 } = require('../controllers/serviceController');
 
-// Public routes
-router.get('/', getServices);
+// Public routes with listing limiter
+router.get('/', apiLimiter, getServices);
 router.get('/:id', getService);
 
-// Protected routes (Vendor only)
-router.post('/', protect, authorize('VENDOR'), upload.array('images', 6), createService);
-router.put('/:id', protect, authorize('VENDOR'), upload.array('images', 6), updateService);
-router.delete('/:id', protect, authorize('VENDOR'), deleteService);
+// Protected routes (Vendor only) with rate limiting
+router.post('/', protect, authorize('VENDOR'), uploadLimiter, upload.array('images', 6), createService);
+router.put('/:id', protect, authorize('VENDOR'), uploadLimiter, upload.array('images', 6), updateService);
+router.delete('/:id', protect, authorize('VENDOR'), apiLimiter, deleteService);
 
 module.exports = router;

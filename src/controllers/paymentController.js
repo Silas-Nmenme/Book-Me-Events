@@ -6,6 +6,8 @@ const {
   paymentReceiptEmail,
   vendorPaymentNotificationEmail,
 } = require('../utils/emailTemplates');
+const { validatePositiveNumber, validateMongoId } = require('../utils/inputValidator');
+const { isResourceOwner } = require('../utils/authorizationHelper');
 
 const verifyFlutterwaveSignature = (rawBody, headerName, signature, secret) => {
   if (!signature || !secret || !rawBody || !headerName) {
@@ -99,26 +101,35 @@ exports.getPayments = async (req, res) => {
   try {
     const { status, page = 1, limit = 10 } = req.query;
 
+    // Validate pagination
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(Math.max(1, parseInt(limit) || 10), 50); // Max 50 per page
+
     let filter = {};
 
     if (status) {
-      filter.paymentStatus = status;
+      const validStatuses = ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'];
+      if (validStatuses.includes(status.toUpperCase())) {
+        filter.paymentStatus = status.toUpperCase();
+      }
     }
 
+    // Authorization: USER sees only own payments, VENDOR sees their vendor payments, ADMIN sees all
     if (req.user.role === 'USER') {
       filter.user = req.user.id;
     } else if (req.user.role === 'VENDOR') {
       filter.vendor = req.user._id;
     }
+    // ADMIN has no filter restriction
 
-    const skip = (page - 1) * limit;
+    const skip = (pageNum - 1) * limitNum;
 
     const payments = await Payment.find(filter)
       .populate('booking')
       .populate('user', 'firstName lastName email')
       .populate('vendor', 'businessName')
       .skip(skip)
-      .limit(Number(limit))
+      .limit(limitNum)
       .sort({ createdAt: -1 });
 
     const total = await Payment.countDocuments(filter);
@@ -127,8 +138,8 @@ exports.getPayments = async (req, res) => {
       success: true,
       count: payments.length,
       total,
-      pages: Math.ceil(total / limit),
-      currentPage: Number(page),
+      pages: Math.ceil(total / limitNum),
+      currentPage: pageNum,
       data: payments
     });
 

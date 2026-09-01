@@ -4,20 +4,27 @@ const asyncHandler = require('express-async-handler');
 const { uploadSingle } = require('../middlewares/uploadMiddleware');
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 const { protect } = require('../middlewares/authMiddleware');
+const { uploadLimiter } = require('../middlewares/rateLimiters');
 const User = require('../models/User');
 const Vendor = require('../models/Vendor');
 
 const router = express.Router();
 
 
-// Upload profile picture for authenticated user (ADMIN/USER/VENDOR).
+// Upload profile picture for authenticated user (ADMIN/USER/VENDOR) with rate limiting
 // Frontend should send: multipart/form-data with field name = `image`.
 // Required: Authorization header (Bearer token).
 router.post(
   '/profile-picture',
   protect,
+  uploadLimiter,
   uploadSingle('image'),
   asyncHandler(async (req, res) => {
+    if (!req.file) {
+      res.status(400);
+      throw new Error('No file uploaded');
+    }
+
     const result = await uploadToCloudinary({
       file: req.file,
       folder: 'profile_pictures',
@@ -47,8 +54,14 @@ router.post(
 router.post(
   '/vendor-kyc',
   protect,
+  uploadLimiter,
   uploadSingle('image'),
   asyncHandler(async (req, res) => {
+    if (!req.file) {
+      res.status(400);
+      throw new Error('No file uploaded');
+    }
+
     const result = await uploadToCloudinary({
       file: req.file,
       folder: 'vendor_kyc',

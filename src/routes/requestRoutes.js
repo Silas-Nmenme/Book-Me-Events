@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/authMiddleware');
+const { apiLimiter } = require('../middlewares/rateLimiters');
 const {
   getRequests,
   getRequest,
@@ -13,24 +14,24 @@ const {
 } = require('../controllers/requestController');
 
 
-// Protected routes
-router.get('/', protect, getRequests);
-router.get('/:id', protect, getRequest);
+// Protected routes with general API rate limiting
+router.get('/', protect, apiLimiter, getRequests);
+router.get('/:id', protect, apiLimiter, getRequest);
 
-// Create request (User only)
-router.post('/', protect, authorize('USER'), createRequest);
+// Create request (User only) with rate limiting
+router.post('/', protect, authorize('USER'), apiLimiter, createRequest);
 
-// Update request
-router.put('/:id', protect, updateRequest);
+// Update request with rate limiting
+router.put('/:id', protect, apiLimiter, updateRequest);
 
-// Delete request (User only)
-router.delete('/:id', protect, deleteRequest);
+// Delete request (User only) with rate limiting
+router.delete('/:id', protect, apiLimiter, deleteRequest);
 
-// Accept/Decline/Cancel requests
+// Accept/Decline/Cancel requests with rate limiting
 
-router.put('/:id/accept', protect, authorize('VENDOR'), acceptRequest);
-router.put('/:id/decline', protect, authorize('VENDOR'), declineRequest);
-router.put('/:id/cancel', protect, cancelRequest);
+router.put('/:id/accept', protect, authorize('VENDOR'), apiLimiter, acceptRequest);
+router.put('/:id/decline', protect, authorize('VENDOR'), apiLimiter, declineRequest);
+router.put('/:id/cancel', protect, apiLimiter, cancelRequest);
 
 
 module.exports = router;

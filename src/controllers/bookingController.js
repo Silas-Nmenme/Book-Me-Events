@@ -1,10 +1,13 @@
 const asyncHandler = require('express-async-handler');
 const Booking = require('../models/Booking');
 const Request = require('../models/Request');
+const Service = require('../models/Service');
 const Vendor = require('../models/Vendor');
 const Payment = require('../models/Payment');
 const { sendEmail } = require('../utils/emailClient');
 const { bookingCreatedEmail } = require('../utils/emailTemplates');
+const { validatePositiveNumber, validatePagination } = require('../utils/inputValidator');
+const { isResourceOwner } = require('../utils/authorizationHelper');
 
 
 // @desc    Get all bookings
@@ -13,10 +16,17 @@ const { bookingCreatedEmail } = require('../utils/emailTemplates');
 exports.getBookings = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
 
+  // Validate pagination
+  const { page: p, limit: l } = validatePagination(page, limit, 50);
+
   let filter = {};
 
   if (status) {
-    filter.bookingStatus = status;
+    // Validate status is a valid booking status
+    const validStatuses = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'];
+    if (validStatuses.includes(String(status).toUpperCase())) {
+      filter.bookingStatus = status;
+    }
   }
 
   // Users see their bookings, Vendors see bookings for their services
@@ -26,15 +36,16 @@ exports.getBookings = asyncHandler(async (req, res) => {
     const vendor = await Vendor.findOne({ user: req.user.id });
     if (vendor) filter.vendor = vendor._id;
   }
+  // ADMIN can see all bookings
 
-  const skip = (page - 1) * limit;
+  const skip = (p - 1) * l;
 
   const bookings = await Booking.find(filter)
     .populate('user', 'firstName lastName email phone')
     .populate('vendor', 'businessName')
     .populate('service')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(l)
     .sort({ createdAt: -1 });
 
   const total = await Booking.countDocuments(filter);
@@ -43,8 +54,8 @@ exports.getBookings = asyncHandler(async (req, res) => {
     success: true,
     count: bookings.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / l),
+    currentPage: p,
     data: bookings,
   });
 });
@@ -63,6 +74,21 @@ exports.getBooking = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Booking not found');
   }
+
+  // Check authorization
+  if (req.user.role === 'USER' && !isResourceOwner(req.user.id, booking.user)) {
+    res.status(403);
+    throw new Error('You cannot access this booking');
+  }
+
+  if (req.user.role === 'VENDOR') {
+    const vendor = await Vendor.findOne({ user: req.user.id });
+    if (!vendor || !vendor._id.equals(booking.vendor)) {
+      res.status(403);
+      throw new Error('You cannot access this booking');
+    }
+  }
+  // ADMIN can access any booking
 
   res.status(200).json({
     success: true,
@@ -83,14 +109,38 @@ exports.createBooking = asyncHandler(async (req, res) => {
     specialRequests,
   } = req.body;
 
+  // Validate required fields
+  if (!request || !eventDate || !eventLocation) {
+    res.status(400);
+    throw new Error('request, eventDate, and eventLocation are required');
+  }
+
+  // Validate totalAmount is provided and is a positive number
+  if (!totalAmount) {
+    res.status(400);
+    throw new Error('totalAmount is required');
+  }
+
+  const amountVal = validatePositiveNumber(totalAmount, 'Total amount', 1000000);
+  if (!amountVal.valid) {
+    res.status(400);
+    throw new Error(amountVal.error);
+  }
+
   // Get request details
   const serviceRequest = await Request.findById(request)
     .populate('vendor', 'businessName user')
-    .populate('service', 'serviceName name');
+    .populate('service', 'serviceName name price');
 
   if (!serviceRequest) {
     res.status(404);
     throw new Error('Request not found');
+  }
+
+  // Verify request belongs to authenticated user
+  if (!isResourceOwner(req.user.id, serviceRequest.user)) {
+    res.status(403);
+    throw new Error('You cannot create a booking for this request');
   }
 
   if (serviceRequest.status !== 'ACCEPTED') {
@@ -111,6 +161,13 @@ exports.createBooking = asyncHandler(async (req, res) => {
     throw new Error('Request must have a service linked, or service must be provided in payload');
   }
 
+  // Server-side price validation: ensure amount matches service price
+  // (prevent client from setting arbitrary prices)
+  if (serviceRequest.service?.price && amountVal.value < serviceRequest.service.price) {
+    res.status(400);
+    throw new Error(`Total amount must be at least ${serviceRequest.service.price}`);
+  }
+
   const booking = await Booking.create({
     request,
     user: req.user.id,
@@ -118,8 +175,8 @@ exports.createBooking = asyncHandler(async (req, res) => {
     service: finalService,
     eventDate,
     eventLocation,
-    totalAmount,
-    specialRequests,
+    totalAmount: amountVal.value,
+    specialRequests: specialRequests ? String(specialRequests).substring(0, 1000) : undefined,
   });
 
   const { logActivity } = require('../utils/activityLog');

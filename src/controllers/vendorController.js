@@ -8,6 +8,8 @@ const {
   vendorVerificationRequestedEmail,
   adminNewVendorApprovalRequestEmail,
 } = require('../utils/emailTemplates');
+const { validatePagination, validateBusinessName, sanitizeString } = require('../utils/inputValidator');
+const { isResourceOwner } = require('../utils/authorizationHelper');
 
 // ===============================
 // Vendor multi-step OTP + profile
@@ -273,29 +275,38 @@ exports.vendorVerifyOtp = asyncHandler(async (req, res) => {
 exports.getVendors = asyncHandler(async (req, res) => {
   const { category, search, verified, page = 1, limit = 10 } = req.query;
 
+  // Validate pagination
+  const paginationVal = validatePagination(page, limit, 50);
+  if (!paginationVal.valid) {
+    res.status(400);
+    throw new Error(paginationVal.error);
+  }
+  const { page: pageNum, limit: limitNum } = paginationVal.value;
+
   let filter = {};
 
-  if (category) {
-    filter.serviceCategories = { $in: [category] };
+  if (category && typeof category === 'string') {
+    filter.serviceCategories = { $in: [sanitizeString(category)] };
   }
 
   if (verified === 'true') {
     filter.isVerified = true;
   }
 
-  if (search) {
+  if (search && typeof search === 'string' && search.trim().length > 0) {
+    const sanitizedSearch = sanitizeString(search).substring(0, 100);
     filter.$or = [
-      { businessName: { $regex: search, $options: 'i' } },
-      { businessDescription: { $regex: search, $options: 'i' } },
+      { businessName: { $regex: sanitizedSearch, $options: 'i' } },
+      { businessDescription: { $regex: sanitizedSearch, $options: 'i' } },
     ];
   }
 
-  const skip = (page - 1) * limit;
+  const skip = (pageNum - 1) * limitNum;
 
   const vendors = await Vendor.find(filter)
     .populate('user', 'firstName lastName profilePicture email phone')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ rating: -1 });
 
   const total = await Vendor.countDocuments(filter);
@@ -304,8 +315,8 @@ exports.getVendors = asyncHandler(async (req, res) => {
     success: true,
     count: vendors.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: vendors,
   });
 });
@@ -441,7 +452,43 @@ exports.updateVendor = asyncHandler(async (req, res) => {
     throw new Error('Not authorized to update this vendor');
   }
 
-  vendor = await Vendor.findByIdAndUpdate(req.params.id, req.body, {
+  // Validate input if provided
+  const updateData = {};
+
+  if (req.body.businessName !== undefined) {
+    const businessNameVal = validateBusinessName(req.body.businessName);
+    if (!businessNameVal.valid) {
+      res.status(400);
+      throw new Error(businessNameVal.error);
+    }
+    updateData.businessName = businessNameVal.value;
+  }
+
+  if (req.body.businessDescription !== undefined && req.body.businessDescription !== null) {
+    updateData.businessDescription = sanitizeString(req.body.businessDescription).substring(0, 2000);
+  }
+
+  if (req.body.serviceCategories !== undefined && Array.isArray(req.body.serviceCategories)) {
+    updateData.serviceCategories = req.body.serviceCategories.map(cat => 
+      sanitizeString(cat).substring(0, 100)
+    ).filter(cat => cat.length > 0);
+  }
+
+  if (req.body.coverageAreas !== undefined && Array.isArray(req.body.coverageAreas)) {
+    updateData.coverageAreas = req.body.coverageAreas.map(area =>
+      sanitizeString(area).substring(0, 100)
+    ).filter(area => area.length > 0);
+  }
+
+  if (req.body.businessRegistrationNumber !== undefined) {
+    updateData.businessRegistrationNumber = sanitizeString(req.body.businessRegistrationNumber).substring(0, 50);
+  }
+
+  if (req.body.taxId !== undefined) {
+    updateData.taxId = sanitizeString(req.body.taxId).substring(0, 50);
+  }
+
+  vendor = await Vendor.findByIdAndUpdate(req.params.id, updateData, {
     new: true,
     runValidators: true,
   });

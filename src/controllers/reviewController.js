@@ -2,6 +2,8 @@ const asyncHandler = require('express-async-handler');
 const Review = require('../models/Review');
 const Booking = require('../models/Booking');
 const Vendor = require('../models/Vendor');
+const { validatePagination, validateRating, sanitizeString } = require('../utils/inputValidator');
+const { isResourceOwner } = require('../utils/authorizationHelper');
 
 // @desc    Get all reviews
 // @route   GET /api/v1/reviews
@@ -9,20 +11,28 @@ const Vendor = require('../models/Vendor');
 exports.getReviews = asyncHandler(async (req, res) => {
   const { vendor, page = 1, limit = 10 } = req.query;
 
+  // Validate pagination
+  const paginationVal = validatePagination(page, limit, 50);
+  if (!paginationVal.valid) {
+    res.status(400);
+    throw new Error(paginationVal.error);
+  }
+  const { page: pageNum, limit: limitNum } = paginationVal.value;
+
   let filter = {};
 
   if (vendor) {
     filter.vendor = vendor;
   }
 
-  const skip = (page - 1) * limit;
+  const skip = (pageNum - 1) * limitNum;
 
   const reviews = await Review.find(filter)
     .populate('user', 'firstName lastName profilePicture')
     .populate('vendor', 'businessName')
     .populate('service', 'serviceName')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: -1 });
 
   const total = await Review.countDocuments(filter);
@@ -31,8 +41,8 @@ exports.getReviews = asyncHandler(async (req, res) => {
     success: true,
     count: reviews.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: reviews,
   });
 });
@@ -71,6 +81,13 @@ exports.createReview = asyncHandler(async (req, res) => {
     photos,
   } = req.body;
 
+  // Validate rating
+  const ratingVal = validateRating(rating);
+  if (!ratingVal.valid) {
+    res.status(400);
+    throw new Error(ratingVal.error);
+  }
+
   // Check if booking exists and belongs to user
   const bookingData = await Booking.findById(booking);
   if (!bookingData) {
@@ -95,9 +112,9 @@ exports.createReview = asyncHandler(async (req, res) => {
     user: req.user.id,
     vendor,
     service,
-    rating,
-    title,
-    comment,
+    rating: ratingVal.value,
+    title: title ? sanitizeString(title).substring(0, 200) : undefined,
+    comment: comment ? sanitizeString(comment).substring(0, 2000) : undefined,
     photos,
   });
 
@@ -129,12 +146,35 @@ exports.updateReview = asyncHandler(async (req, res) => {
   }
 
   // Check if user owns the review
-  if (review.user.toString() !== req.user.id && req.user.role !== 'ADMIN') {
+  if (!isResourceOwner(req.user.id, review.user) && req.user.role !== 'ADMIN') {
     res.status(403);
     throw new Error('Not authorized to update this review');
   }
 
-  review = await Review.findByIdAndUpdate(req.params.id, req.body, {
+  // Validate rating if provided
+  const updateData = {};
+  if (req.body.rating !== undefined) {
+    const ratingVal = validateRating(req.body.rating);
+    if (!ratingVal.valid) {
+      res.status(400);
+      throw new Error(ratingVal.error);
+    }
+    updateData.rating = ratingVal.value;
+  }
+
+  if (req.body.title !== undefined && req.body.title !== null) {
+    updateData.title = sanitizeString(req.body.title).substring(0, 200);
+  }
+
+  if (req.body.comment !== undefined && req.body.comment !== null) {
+    updateData.comment = sanitizeString(req.body.comment).substring(0, 2000);
+  }
+
+  if (req.body.photos !== undefined) {
+    updateData.photos = req.body.photos;
+  }
+
+  review = await Review.findByIdAndUpdate(req.params.id, updateData, {
     new: true,
     runValidators: true,
   });

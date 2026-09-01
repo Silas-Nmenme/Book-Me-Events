@@ -1,11 +1,20 @@
 const asyncHandler = require('express-async-handler');
 const Message = require('../models/Message');
+const { validatePagination, sanitizeString } = require('../utils/inputValidator');
 
 // @desc    Get all messages for user
 // @route   GET /api/v1/messages
 // @access  Private
 exports.getMessages = asyncHandler(async (req, res) => {
   const { conversation, page = 1, limit = 20 } = req.query;
+
+  // Validate pagination
+  const paginationVal = validatePagination(page, limit, 50);
+  if (!paginationVal.valid) {
+    res.status(400);
+    throw new Error(paginationVal.error);
+  }
+  const { page: pageNum, limit: limitNum } = paginationVal.value;
 
   let filter = {
     $or: [{ sender: req.user.id }, { recipient: req.user.id }],
@@ -15,13 +24,13 @@ exports.getMessages = asyncHandler(async (req, res) => {
     filter.conversationId = conversation;
   }
 
-  const skip = (page - 1) * limit;
+  const skip = (pageNum - 1) * limitNum;
 
   const messages = await Message.find(filter)
     .populate('sender', 'firstName lastName profilePicture')
     .populate('recipient', 'firstName lastName profilePicture')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: -1 });
 
   const total = await Message.countDocuments(filter);
@@ -30,8 +39,8 @@ exports.getMessages = asyncHandler(async (req, res) => {
     success: true,
     count: messages.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: messages,
   });
 });
@@ -42,7 +51,15 @@ exports.getMessages = asyncHandler(async (req, res) => {
 exports.getConversation = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20 } = req.query;
 
-  const skip = (page - 1) * limit;
+  // Validate pagination
+  const paginationVal = validatePagination(page, limit, 50);
+  if (!paginationVal.valid) {
+    res.status(400);
+    throw new Error(paginationVal.error);
+  }
+  const { page: pageNum, limit: limitNum } = paginationVal.value;
+
+  const skip = (pageNum - 1) * limitNum;
 
   const messages = await Message.find({
     $or: [
@@ -53,7 +70,7 @@ exports.getConversation = asyncHandler(async (req, res) => {
     .populate('sender', 'firstName lastName profilePicture')
     .populate('recipient', 'firstName lastName profilePicture')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: 1 });
 
   // Mark messages as read
@@ -66,9 +83,19 @@ exports.getConversation = asyncHandler(async (req, res) => {
     { isRead: true, readAt: new Date() }
   );
 
+  const total = await Message.countDocuments({
+    $or: [
+      { sender: req.user.id, recipient: req.params.userId },
+      { sender: req.params.userId, recipient: req.user.id },
+    ],
+  });
+
   res.status(200).json({
     success: true,
     count: messages.length,
+    total,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: messages,
   });
 });
@@ -80,7 +107,15 @@ exports.getConversationByRequestId = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20 } = req.query;
   const { requestId } = req.params;
 
-  const skip = (page - 1) * limit;
+  // Validate pagination
+  const paginationVal = validatePagination(page, limit, 50);
+  if (!paginationVal.valid) {
+    res.status(400);
+    throw new Error(paginationVal.error);
+  }
+  const { page: pageNum, limit: limitNum } = paginationVal.value;
+
+  const skip = (pageNum - 1) * limitNum;
 
   // Only allow members of the request to access its messages.
   // Request belongs to a USER (req.user.id) and a VENDOR (request.vendor). Vendor's owner is resolved below.
@@ -122,7 +157,7 @@ exports.getConversationByRequestId = asyncHandler(async (req, res) => {
     .populate('recipient', 'firstName lastName profilePicture')
     .populate('booking')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: 1 });
 
   // Mark as read for the current recipient.
@@ -136,9 +171,20 @@ exports.getConversationByRequestId = asyncHandler(async (req, res) => {
     { isRead: true, readAt: new Date() }
   );
 
+  const total = await Message.countDocuments({
+    $or: [
+      { sender: req.user.id, recipient: otherUserId },
+      { sender: otherUserId, recipient: req.user.id },
+    ],
+    request: requestId,
+  });
+
   res.status(200).json({
     success: true,
     count: messages.length,
+    total,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: messages,
   });
 });

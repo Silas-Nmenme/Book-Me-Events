@@ -2,40 +2,53 @@ const asyncHandler = require('express-async-handler');
 const Request = require('../models/Request');
 const Service = require('../models/Service');
 const Vendor = require('../models/Vendor');
+const { validatePagination, validatePositiveNumber } = require('../utils/inputValidator');
+const { isResourceOwner } = require('../utils/authorizationHelper');
 
 // @desc    Get all requests
-
 // @route   GET /api/v1/requests
 // @access  Private
 exports.getRequests = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
 
+  // Validate pagination
+  const paginationVal = validatePagination(page, limit, 50);
+  if (!paginationVal.valid) {
+    res.status(400);
+    throw new Error(paginationVal.error);
+  }
+  const { page: pageNum, limit: limitNum } = paginationVal.value;
+
   let filter = {};
 
   if (status) {
-    // Frontend sends lowercase; DB stores uppercase.
-    filter.status = status.toString().toUpperCase();
+    const validStatuses = ['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED', 'BOOKED'];
+    const statusUpper = status.toString().toUpperCase();
+    if (validStatuses.includes(statusUpper)) {
+      filter.status = statusUpper;
+    }
   } else {
     filter.status = { $ne: 'BOOKED' };
   }
 
-  // Vendors see requests for their services, Users see their own requests
+  // Authorization: Vendors see requests for their services, Users see their own requests
   if (req.user.role === 'VENDOR') {
     const vendor = await Vendor.findOne({ user: req.user.id });
     if (vendor) filter.vendor = vendor._id;
   } else if (req.user.role === 'USER') {
     filter.user = req.user.id;
   }
+  // ADMIN sees all requests
 
 
-  const skip = (page - 1) * limit;
+  const skip = (pageNum - 1) * limitNum;
 
   const requests = await Request.find(filter)
     .populate('user', 'firstName lastName email phone')
     .populate('vendor', 'businessName user')
     .populate('service')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: -1 });
 
 
@@ -45,8 +58,8 @@ exports.getRequests = asyncHandler(async (req, res) => {
     success: true,
     count: requests.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: requests,
   });
 });
@@ -63,6 +76,17 @@ exports.getRequest = asyncHandler(async (req, res) => {
   if (!request) {
     res.status(404);
     throw new Error('Request not found');
+  }
+
+  // Authorization: Users can only see their own requests, Vendors can see requests for their services, Admin can see all
+  if (req.user.role !== 'ADMIN') {
+    const isOwner = request.user && request.user._id && isResourceOwner(req.user.id, request.user._id);
+    const isVendor = request.vendor && request.vendor._id && request.vendor._id.toString() === req.user._id?.toString();
+    
+    if (!isOwner && !isVendor) {
+      res.status(403);
+      throw new Error('Not authorized to access this request');
+    }
   }
 
   res.status(200).json({
@@ -117,14 +141,32 @@ exports.createRequest = asyncHandler(async (req, res) => {
     throw new Error('Valid eventDate is required');
   }
 
-  if (!eventLocation) {
+  if (!eventLocation || typeof eventLocation !== 'string' || eventLocation.trim().length === 0) {
     res.status(400);
     throw new Error('eventLocation is required');
   }
 
-  if (!eventDescription) {
+  if (!eventDescription || typeof eventDescription !== 'string' || eventDescription.trim().length === 0) {
     res.status(400);
     throw new Error('eventDescription is required');
+  }
+
+  // Validate budgetAmount if provided
+  if (budgetAmount !== undefined && budgetAmount !== null) {
+    const budgetVal = validatePositiveNumber(budgetAmount, 'budgetAmount', 1000000);
+    if (!budgetVal.valid) {
+      res.status(400);
+      throw new Error(budgetVal.error);
+    }
+  }
+
+  // Validate guestCount if provided
+  if (guestCount !== undefined && guestCount !== null) {
+    const guestVal = validatePositiveNumber(guestCount, 'guestCount', 10000);
+    if (!guestVal.valid) {
+      res.status(400);
+      throw new Error(guestVal.error);
+    }
   }
 
 const request = await Request.create({
@@ -132,11 +174,11 @@ const request = await Request.create({
     vendor,
     service: resolvedServiceId || undefined,
     eventDate: parsedEventDate,
-    eventLocation,
-    eventDescription,
+    eventLocation: eventLocation.trim(),
+    eventDescription: eventDescription.trim(),
     guestCount,
     budgetAmount,
-    notes,
+    notes: notes ? notes.trim().substring(0, 1000) : undefined, // Max 1000 chars
     responseDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
   });
 

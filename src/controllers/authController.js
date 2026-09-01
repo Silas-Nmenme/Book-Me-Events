@@ -9,6 +9,13 @@ const {
   passwordResetSuccessEmail,
   loginSuccessEmail,
 } = require('../utils/emailTemplates');
+const {
+  validateEmail,
+  validatePhone,
+  validatePasswordStrength,
+  validateName,
+  sanitizeString,
+} = require('../utils/inputValidator');
 
 // ===============================
 // Helpers: 6-digit OTP (DB-backed)
@@ -28,10 +35,35 @@ function otpExpiryMs() {
 exports.register = asyncHandler(async (req, res) => {
   const { firstName, lastName, email, phone, password, passwordConfirm } = req.body || {};
 
-  // Validation
-  if (!firstName || !lastName || !email || !phone || !password || !passwordConfirm) {
+  // Comprehensive input validation
+  const firstNameVal = validateName(firstName, 'First name');
+  if (!firstNameVal.valid) {
     res.status(400);
-    throw new Error('Please provide all required fields');
+    throw new Error(firstNameVal.error);
+  }
+
+  const lastNameVal = validateName(lastName, 'Last name');
+  if (!lastNameVal.valid) {
+    res.status(400);
+    throw new Error(lastNameVal.error);
+  }
+
+  const emailVal = validateEmail(email);
+  if (!emailVal.valid) {
+    res.status(400);
+    throw new Error(emailVal.error);
+  }
+
+  const phoneVal = validatePhone(phone);
+  if (!phoneVal.valid) {
+    res.status(400);
+    throw new Error(phoneVal.error);
+  }
+
+  const passwordStrength = validatePasswordStrength(password);
+  if (!passwordStrength.valid) {
+    res.status(400);
+    throw new Error(passwordStrength.error);
   }
 
   if (password !== passwordConfirm) {
@@ -40,17 +72,18 @@ exports.register = asyncHandler(async (req, res) => {
   }
 
   // Check if user already exists
-  const userExists = await User.findOne({ email: email.toLowerCase() });
+  const userExists = await User.findOne({ email: emailVal.value });
   if (userExists) {
     res.status(400);
     throw new Error('Email already registered');
   }
 
+  // Create user with validated input
   const user = await User.create({
-    firstName,
-    lastName,
-    email: email.toLowerCase(),
-    phone,
+    firstName: firstNameVal.value,
+    lastName: lastNameVal.value,
+    email: emailVal.value,
+    phone: phoneVal.value,
     password,
     role: 'USER',
     isVerified: false,
@@ -143,28 +176,20 @@ exports.verifyOtp = asyncHandler(async (req, res) => {
 exports.login = asyncHandler(async (req, res) => {
   const { email, password } = req.body || {};
 
-  const loginEmail = (email || '').toString().trim();
-  const loginPassword = password === undefined || password === null ? undefined : password.toString();
-
-  if (!loginEmail) {
+  // Validate input
+  const emailVal = validateEmail(email);
+  if (!emailVal.valid) {
     res.status(400);
-    throw new Error('Please provide email');
+    throw new Error('Invalid email format');
   }
 
-  if (!loginPassword || loginPassword.trim() === '') {
+  if (!password || typeof password !== 'string' || password.trim() === '') {
     res.status(400);
     throw new Error('Password is required');
   }
 
-  // NOTE: OTP/TOTP removed for ADMIN login.
-  // Ignore any otp/totpCode fields; require password only.
-
-  const user = await User.findOne({
-    $or: [
-      { email: loginEmail.toLowerCase() },
-      { username: loginEmail },
-    ],
-  });
+  // Find user by email
+  const user = await User.findOne({ email: emailVal.value });
 
   if (!user) {
     res.status(401);
@@ -172,12 +197,16 @@ exports.login = asyncHandler(async (req, res) => {
   }
 
   if (!user.isVerified) {
-    // users must verify email via OTP at registration time
     res.status(403);
-    throw new Error('Account not verified');
+    throw new Error('Account not verified. Please verify your email first.');
   }
 
-  const isMatch = await user.matchPassword(loginPassword);
+  if (!user.isActive) {
+    res.status(403);
+    throw new Error('Account has been deactivated');
+  }
+
+  const isMatch = await user.matchPassword(password);
   if (!isMatch) {
     res.status(401);
     throw new Error('Invalid credentials');
@@ -246,12 +275,14 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
   try {
     const { email } = req.body || {};
 
-    if (!email) {
+    // Validate email format
+    const emailVal = validateEmail(email);
+    if (!emailVal.valid) {
       res.status(400);
-      throw new Error('Please provide email');
+      throw new Error(emailVal.error);
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: emailVal.value });
 
     // Security: don't reveal whether email exists
     if (!user) {
@@ -265,6 +296,7 @@ exports.forgotPassword = asyncHandler(async (req, res) => {
     const crypto = require('crypto');
     const PasswordResetToken = require('../models/PasswordResetToken');
 
+    // Revoke any existing active tokens
     await PasswordResetToken.updateMany(
       { userId: user._id, purpose: 'password_reset', revokedAt: null, usedAt: null },
       { $set: { revokedAt: new Date() } }
@@ -324,6 +356,13 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   if (password !== passwordConfirm) {
     res.status(400);
     throw new Error('Passwords do not match');
+  }
+
+  // Validate password strength
+  const passwordStrength = validatePasswordStrength(password);
+  if (!passwordStrength.valid) {
+    res.status(400);
+    throw new Error(passwordStrength.error);
   }
 
   const crypto = require('crypto');

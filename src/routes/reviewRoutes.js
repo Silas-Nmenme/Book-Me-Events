@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middlewares/authMiddleware');
+const { reviewCreationLimiter } = require('../middlewares/rateLimiters');
 const {
   getReviews,
   getReview,
@@ -16,8 +17,8 @@ const {
 router.get('/', getReviews);
 router.get('/:id', getReview);
 
-// Protected routes
-router.post('/', protect, createReview);
+// Protected routes with rate limiting
+router.post('/', protect, reviewCreationLimiter, createReview);
 router.put('/:id', protect, updateReview);
 router.delete('/:id', protect, deleteReview);
 

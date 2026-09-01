@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect, authorize } = require('../middlewares/authMiddleware');
 const { body } = require('express-validator');
 const validateRequest = require('../middlewares/validateRequest');
+const { paymentCreationLimiter } = require('../middlewares/rateLimiters');
 const {
   getPayments,
   getPayment,
@@ -26,11 +27,12 @@ router.get('/summary', protect, getPaymentsSummary);
 router.get('/:id', protect, getPayment);
 
 
-// Create payment (User only)
+// Create payment (User only) with rate limiting
 router.post(
   '/',
   protect,
   authorize('USER'),
+  paymentCreationLimiter,
   [
     body('booking').exists().withMessage('booking is required').isMongoId().withMessage('booking must be a valid id'),
     body('paymentMethod').exists().withMessage('paymentMethod is required').isIn(['CARD', 'OFFLINE', 'WALLET']).withMessage('invalid paymentMethod'),
@@ -44,8 +46,8 @@ router.post(
 // Refund payment
 router.post('/:id/refund', protect, refundPayment);
 
-// Create Flutterwave Payment Link
-router.post('/initialize', protect, authorize('USER'), createFlutterwavePayment);
+// Create Flutterwave Payment Link with rate limiting
+router.post('/initialize', protect, authorize('USER'), paymentCreationLimiter, createFlutterwavePayment);
 
 
 module.exports = router;

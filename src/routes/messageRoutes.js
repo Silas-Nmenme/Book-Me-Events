@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middlewares/authMiddleware');
+const { messageLimiter } = require('../middlewares/rateLimiters');
 const {
   getMessages,
   getConversation,
@@ -29,12 +30,12 @@ router.get('/:id', protect, getMessage);
 
 
 
-// Send message
-router.post('/', protect, sendMessage);
+// Send message with rate limiting
+router.post('/', protect, messageLimiter, sendMessage);
 
-// Request-based conversation messaging
+// Request-based conversation messaging with rate limiting
 router.get('/request/:requestId', protect, getConversationByRequestId);
-router.post('/request/:requestId', protect, sendMessageByRequestId);
+router.post('/request/:requestId', protect, messageLimiter, sendMessageByRequestId);
 
 // Mark as read
 router.put('/:id/read', protect, markAsRead);
