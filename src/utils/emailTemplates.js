@@ -239,6 +239,46 @@ function welcomeEmail({ firstName, role, verificationLink }) {
   return { subject, text, html };
 }
 
+function otpVerificationEmail({ firstName, otpCode, expiresInMinutes, purposeLabel }) {
+  const safeFirstName = escapeHtml(firstName || 'there');
+  const safeOtp = escapeHtml(safeStr(otpCode, ''));
+  const safeMinutes = Number.isFinite(Number(expiresInMinutes)) ? Number(expiresInMinutes) : 10;
+  const safePurpose = safeStr(purposeLabel, 'account verification');
+  const subject = `Your ${APP_NAME} verification code`;
+
+  const text = toPlainText({
+    lines: [
+      `Hi ${safeFirstName},`,
+      `Your one-time code for ${safePurpose} is: ${safeOtp}`,
+      `This code expires in ${safeMinutes} minutes.`,
+      `If you didn’t request this, please ignore this email.`,
+    ],
+  });
+
+  const bodyInnerHtml = `
+    <p style="margin:0 0 10px;font-size:14px;color:#0f172a;font-family:DM Sans, Arial, Helvetica, sans-serif;">Hi <strong>${safeFirstName}</strong>,</p>
+    <p style="margin:0 0 16px;font-size:13px;color:#475569;line-height:1.7;font-family:DM Sans, Arial, Helvetica, sans-serif;">
+      Use the code below to complete your ${escapeHtml(safePurpose)}. This code expires in ${safeMinutes} minutes.
+    </p>
+    <div style="text-align:center;padding:14px 0;">
+      <span style="display:inline-block;padding:14px 28px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;font-size:28px;font-weight:900;letter-spacing:0.3em;color:#065f46;font-family:Sora, Georgia, 'Times New Roman', Times, serif;">
+        ${safeOtp}
+      </span>
+    </div>
+    <p style="margin:16px 0 0;font-size:12px;color:#94a3b8;line-height:1.6;font-family:DM Sans, Arial, Helvetica, sans-serif;">
+      If you didn’t request this code, you can safely ignore this email.
+    </p>
+  `;
+
+  const html = buildBaseEmail({
+    title: 'Your verification code',
+    statusLabel: 'Verification code',
+    bodyInnerHtml,
+  });
+
+  return { subject, text, html };
+}
+
 function passwordResetRequestedEmail({ firstName, resetLink }) {
   const safeFirstName = escapeHtml(firstName || 'there');
   const safeResetLink = safeStr(resetLink, '');
@@ -721,6 +761,7 @@ function vendorPaymentNotificationEmail({ vendorName, bookingId, amount, currenc
 
 module.exports = {
   welcomeEmail,
+  otpVerificationEmail,
   passwordResetRequestedEmail,
   passwordResetSuccessEmail,
   loginSuccessEmail,
