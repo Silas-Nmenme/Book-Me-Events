@@ -94,7 +94,10 @@ const sendEmail = async ({ to, subject, text, html } = {}) => {
     throw new Error('Missing email subject');
   }
 
-  const from = process.env.SMTP_FROM || process.env.MAIL_USER || process.env.EMAIL_FROM || `no-reply@${process.env.APP_DOMAIN || 'bookmeevent.com'}`;
+  const fromAddress = process.env.MAIL_USER || process.env.EMAIL_FROM || `no-reply@${process.env.APP_DOMAIN || 'bookmeevent.com'}`;
+  const fromName = process.env.SMTP_FROM;
+  // Gmail rejects a From header with a display name but no valid address, so always include one.
+  const from = fromName ? `"${fromName}" <${fromAddress}>` : fromAddress;
   const safeText = text || (html ? html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : '');
 
   try {
