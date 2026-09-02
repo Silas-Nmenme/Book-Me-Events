@@ -50,7 +50,12 @@ function validateEnvironment() {
 
   // Validate JWT_SECRET strength
   if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
-    warnings.push('JWT_SECRET is weak (less than 32 chars). Use a longer, random string.');
+    const message = 'JWT_SECRET is weak (less than 32 chars). Use a longer, random string.';
+    if (process.env.NODE_ENV === 'production') {
+      missing.push('JWT_SECRET (must be at least 32 characters in production)');
+    } else {
+      warnings.push(message);
+    }
   }
 
   // Validate test keys usage in production

@@ -11,13 +11,6 @@ const {
   getVendorBookings,
   getVendorReviews,
 } = require('../controllers/vendorController');
-const { getVendorAnalytics } = require('../controllers/vendorAnalyticsController');
-const { getVendorSla } = require('../controllers/vendorSlaController');
-
-// Vendor analytics and SLA must be registered before the generic /:id route.
-router.get('/analytics', protect, authorize('VENDOR'), getVendorAnalytics);
-router.get('/sla', protect, authorize('VENDOR'), getVendorSla);
-
 // Public routes
 router.get('/', getVendors);
 router.get('/:id', getVendor);

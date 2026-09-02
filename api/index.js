@@ -65,9 +65,7 @@ module.exports = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: error?.message || 'Internal server error',
-      // Helps you see the root cause in dev; remove if you prefer less detail.
-      debug: error?.stack,
+      message: 'Internal server error',
     });
   }
 };

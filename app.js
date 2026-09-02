@@ -145,7 +145,6 @@ safeRoute('/api/v1/uploads', require('./src/routes/uploadRoutes'));
 
 // USER MVP: activity, announcements read/unread, tickets
 safeRoute('/api/v1/users', require('./src/routes/userActivityRoutes'));
-safeRoute('/api/v1/announcements', require('./src/routes/announcementReadRoutes'));
 
 // VENDOR MVP: analytics/sla/tickets/promotions
 safeRoute('/api/v1/tickets', require('./src/routes/ticketRoutes'));

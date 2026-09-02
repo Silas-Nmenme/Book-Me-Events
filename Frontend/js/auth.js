@@ -7,11 +7,20 @@ export function redirectToLogin(redirectTo = 'auth-login.html') {
 
 export function requireAuth(redirectTo = 'auth-login.html') {
   const token = getToken();
-  if (!token) {
+  if (!token || isTokenExpired(token)) {
     redirectToLogin(redirectTo);
     return false;
   }
   return true;
+}
+
+function isTokenExpired(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return !payload.exp || payload.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
 }
 
 export async function loginFlow({ email, password }) {

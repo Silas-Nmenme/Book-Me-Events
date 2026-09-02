@@ -4,18 +4,18 @@ const errorHandler = (err, req, res, next) => {
       ? res.statusCode
       : 500;
 
-  const safeMessage = (() => {
-    const m = err?.message ?? 'Internal server error';
-    return typeof m === 'string' ? m : JSON.stringify(m);
-  })();
+  const isServerError = statusCode >= 500;
+  const safeMessage = isServerError
+    ? 'Internal server error'
+    : (typeof err?.message === 'string' ? err.message : 'Request failed');
+
+  if (isServerError) {
+    console.error('Unhandled request error:', err);
+  }
 
   res.status(statusCode).json({
     success: false,
     message: safeMessage,
-    stack:
-      process.env.NODE_ENV !== 'production'
-        ? err?.stack
-        : undefined,
   });
 };
 

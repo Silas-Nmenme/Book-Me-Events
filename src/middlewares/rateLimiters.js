@@ -3,12 +3,12 @@
  * Protects against brute force, DoS, and enumeration attacks
  */
 
-const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator, rateLimit } = require('express-rate-limit');
 
 // Account key generator - consistent across limiters
 const createAccountKey = (req) => {
   const email = req.body?.email || req.body?.username || '';
-  return email ? String(email).toLowerCase() : '';
+  return email ? String(email).toLowerCase() : ipKeyGenerator(req.ip);
 };
 
 // ==================== AUTH LIMITERS ====================
@@ -82,7 +82,7 @@ const bookingCreationLimiter = rateLimit({
   max: 20, // 20 bookings per hour per user
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `booking:${req.user?.id || req.ip}`,
+  keyGenerator: (req) => `booking:${req.user?.id || ipKeyGenerator(req.ip)}`,
   message: { success: false, message: 'Too many booking requests. Try again later.' },
   skip: (req) => process.env.NODE_ENV === 'test' || !req.user,
 });
@@ -93,7 +93,7 @@ const paymentCreationLimiter = rateLimit({
   max: 30, // 30 payment attempts per hour
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `payment:${req.user?.id || req.ip}`,
+  keyGenerator: (req) => `payment:${req.user?.id || ipKeyGenerator(req.ip)}`,
   message: { success: false, message: 'Too many payment attempts. Try again later.' },
   skip: (req) => process.env.NODE_ENV === 'test' || !req.user,
 });
@@ -104,7 +104,7 @@ const reviewCreationLimiter = rateLimit({
   max: 10, // 10 reviews per day per user
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `review:${req.user?.id || req.ip}`,
+  keyGenerator: (req) => `review:${req.user?.id || ipKeyGenerator(req.ip)}`,
   message: { success: false, message: 'You can only submit 10 reviews per day.' },
   skip: (req) => process.env.NODE_ENV === 'test' || !req.user,
 });
@@ -115,7 +115,7 @@ const messageLimiter = rateLimit({
   max: 10, // 10 messages per minute per user
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `message:${req.user?.id || req.ip}`,
+  keyGenerator: (req) => `message:${req.user?.id || ipKeyGenerator(req.ip)}`,
   message: { success: false, message: 'You are messaging too quickly. Please slow down.' },
   skip: (req) => process.env.NODE_ENV === 'test' || !req.user,
 });
@@ -126,7 +126,7 @@ const uploadLimiter = rateLimit({
   max: 50, // 50 uploads per hour per user
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `upload:${req.user?.id || req.ip}`,
+  keyGenerator: (req) => `upload:${req.user?.id || ipKeyGenerator(req.ip)}`,
   message: { success: false, message: 'Too many upload attempts. Try again later.' },
   skip: (req) => process.env.NODE_ENV === 'test' || !req.user,
 });
@@ -137,7 +137,7 @@ const adminOperationLimiter = rateLimit({
   max: 200, // Higher for admin but still tracked
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `admin:${req.user?.id || req.ip}`,
+  keyGenerator: (req) => `admin:${req.user?.id || ipKeyGenerator(req.ip)}`,
   message: { success: false, message: 'Admin operation rate limit exceeded.' },
   skip: (req) => process.env.NODE_ENV === 'test' || !req.user,
 });
