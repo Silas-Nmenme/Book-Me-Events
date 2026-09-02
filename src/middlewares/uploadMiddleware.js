@@ -43,11 +43,6 @@ const fileFilter = (req, file, cb) => {
     return cb(new Error('Invalid file type. Upload an image file (png/jpg/jpeg/webp/gif).'));
   }
 
-  // Verify actual file content via magic bytes
-  if (!verifyFileSignature(file.buffer, file.mimetype)) {
-    return cb(new Error('File content does not match claimed format. Ensure you are uploading a valid image.'));
-  }
-
   cb(null, true);
 };
 
@@ -59,10 +54,31 @@ const upload = multer({
   fileFilter,
 });
 
-const uploadSingle = (fieldName) => upload.single(fieldName);
+function validateUploadedFiles(req, res, next) {
+  const files = req.file ? [req.file] : Array.isArray(req.files) ? req.files : [];
+  const invalidFile = files.find((file) => !verifyFileSignature(file.buffer, file.mimetype));
+
+  if (invalidFile) {
+    res.status(400);
+    return next(new Error('File content does not match claimed format. Ensure you are uploading a valid image.'));
+  }
+
+  next();
+}
+
+const uploadSingle = (fieldName) => (req, res, next) => {
+  upload.single(fieldName)(req, res, (err) => {
+    if (err) {
+      res.status(400);
+      return next(err);
+    }
+    return validateUploadedFiles(req, res, next);
+  });
+};
 
 module.exports = {
   upload,
   uploadSingle,
+  validateUploadedFiles,
 };
 
