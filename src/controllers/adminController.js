@@ -50,12 +50,7 @@ exports.getDashboard = asyncHandler(async (req, res) => {
 exports.getAllUsers = asyncHandler(async (req, res) => {
   const { role, page = 1, limit = 10 } = req.query;
 
-  const pagination = validatePagination(page, limit, 50);
-  if (!pagination.valid) {
-    res.status(400);
-    throw new Error(pagination.error);
-  }
-  const { page: pageNum, limit: limitNum } = pagination.value;
+  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
 
   let filter = {};
   if (role) {
@@ -88,12 +83,7 @@ exports.getAllUsers = asyncHandler(async (req, res) => {
 exports.getPendingVendors = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
 
-  const pagination = validatePagination(page, limit, 50);
-  if (!pagination.valid) {
-    res.status(400);
-    throw new Error(pagination.error);
-  }
-  const { page: pageNum, limit: limitNum } = pagination.value;
+  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
 
   const skip = (pageNum - 1) * limitNum;
 
@@ -271,12 +261,7 @@ exports.toggleUserStatus = asyncHandler(async (req, res) => {
 exports.getAllBookings = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
 
-  const pagination = validatePagination(page, limit, 50);
-  if (!pagination.valid) {
-    res.status(400);
-    throw new Error(pagination.error);
-  }
-  const { page: pageNum, limit: limitNum } = pagination.value;
+  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
 
   let filter = {};
   if (status) {
@@ -311,12 +296,7 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
 exports.getAllPayments = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
 
-  const pagination = validatePagination(page, limit, 50);
-  if (!pagination.valid) {
-    res.status(400);
-    throw new Error(pagination.error);
-  }
-  const { page: pageNum, limit: limitNum } = pagination.value;
+  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
 
   let filter = {};
   if (status) {
