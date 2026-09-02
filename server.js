@@ -3,6 +3,7 @@ require('dotenv').config();
 const http = require('http');
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 
 const app = require('./app');
 const connectDB = require('./src/config/db');
@@ -70,6 +71,10 @@ const startServer = async () => {
 
         const requested = String(userId);
         const ownId = String(socket.userFull._id);
+
+        if (!mongoose.Types.ObjectId.isValid(requested)) {
+          return;
+        }
 
         // Non-admin users can only join their own room
         if (socket.userFull.role !== 'ADMIN' && requested !== ownId) {

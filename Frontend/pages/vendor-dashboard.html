@@ -150,39 +150,39 @@
 
               <div class="row g-3 mb-3" id="statsStrip">
                 <div class="col-6 col-md-4">
-                  <div class="card card-glass p-3 h-100 bme-card-item">
-                    <div class="text-muted-soft small">Incoming requests</div>
-                    <div class="h4 fw-bold mb-0" id="vStatRequests">—</div>
+                  <div class="bme-stat-card h-100">
+                    <div class="bme-stat-card__label">Incoming requests</div>
+                    <div class="bme-stat-card__value" id="vStatRequests">—</div>
                   </div>
                 </div>
                 <div class="col-6 col-md-4">
-                  <div class="card card-glass p-3 h-100 bme-card-item">
-                    <div class="text-muted-soft small">Accepted requests</div>
-                    <div class="h4 fw-bold mb-0" id="vStatAccepted">—</div>
+                  <div class="bme-stat-card h-100">
+                    <div class="bme-stat-card__label">Accepted requests</div>
+                    <div class="bme-stat-card__value" id="vStatAccepted">—</div>
                   </div>
                 </div>
                 <div class="col-6 col-md-4">
-                  <div class="card card-glass p-3 h-100 bme-card-item">
-                    <div class="text-muted-soft small">My services</div>
-                    <div class="h4 fw-bold mb-0" id="vStatServices">—</div>
+                  <div class="bme-stat-card h-100">
+                    <div class="bme-stat-card__label">My services</div>
+                    <div class="bme-stat-card__value" id="vStatServices">—</div>
                   </div>
                 </div>
                 <div class="col-6 col-md-4">
-                  <div class="card card-glass p-3 h-100 bme-card-item">
-                    <div class="text-muted-soft small">Bookings pending</div>
-                    <div class="h4 fw-bold mb-0" id="vStatPendingBookings">—</div>
+                  <div class="bme-stat-card h-100">
+                    <div class="bme-stat-card__label">Bookings pending</div>
+                    <div class="bme-stat-card__value" id="vStatPendingBookings">—</div>
                   </div>
                 </div>
                 <div class="col-6 col-md-4">
-                  <div class="card card-glass p-3 h-100 bme-card-item">
-                    <div class="text-muted-soft small">Completed bookings</div>
-                    <div class="h4 fw-bold mb-0" id="vStatCompletedBookings">—</div>
+                  <div class="bme-stat-card h-100">
+                    <div class="bme-stat-card__label">Completed bookings</div>
+                    <div class="bme-stat-card__value" id="vStatCompletedBookings">—</div>
                   </div>
                 </div>
                 <div class="col-6 col-md-4">
-                  <div class="card card-glass p-3 h-100 bme-card-item">
-                    <div class="text-muted-soft small">SLA breach rate</div>
-                    <div class="h4 fw-bold mb-0" id="vStatBreachRate">—</div>
+                  <div class="bme-stat-card h-100">
+                    <div class="bme-stat-card__label">SLA breach rate</div>
+                    <div class="bme-stat-card__value" id="vStatBreachRate">—</div>
                   </div>
                 </div>
               </div>
@@ -390,7 +390,7 @@
           } else {
             avatarEl.textContent = getAvatarInitials(me?.firstName || me?.user?.firstName || 'BME');
             avatarEl.style.backgroundImage = '';
-            avatarEl.style.background = 'rgba(124,92,255,0.12)';
+            avatarEl.style.background = 'rgba(124,58,237,0.12)';
           }
 
           return me;

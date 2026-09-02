@@ -10,6 +10,7 @@ const {
   vendorVerificationSuccessEmail,
   vendorVerificationRejectedEmail,
 } = require('../utils/emailTemplates');
+const { validatePagination } = require('../utils/inputValidator');
 
 
 
@@ -49,17 +50,24 @@ exports.getDashboard = asyncHandler(async (req, res) => {
 exports.getAllUsers = asyncHandler(async (req, res) => {
   const { role, page = 1, limit = 10 } = req.query;
 
+  const pagination = validatePagination(page, limit, 50);
+  if (!pagination.valid) {
+    res.status(400);
+    throw new Error(pagination.error);
+  }
+  const { page: pageNum, limit: limitNum } = pagination.value;
+
   let filter = {};
   if (role) {
     filter.role = role;
   }
 
-  const skip = (page - 1) * limit;
+  const skip = (pageNum - 1) * limitNum;
 
   const users = await User.find(filter)
     .select('-password -refreshToken')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: -1 });
 
   const total = await User.countDocuments(filter);
@@ -68,8 +76,8 @@ exports.getAllUsers = asyncHandler(async (req, res) => {
     success: true,
     count: users.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: users,
   });
 });
@@ -80,12 +88,19 @@ exports.getAllUsers = asyncHandler(async (req, res) => {
 exports.getPendingVendors = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
 
-  const skip = (page - 1) * limit;
+  const pagination = validatePagination(page, limit, 50);
+  if (!pagination.valid) {
+    res.status(400);
+    throw new Error(pagination.error);
+  }
+  const { page: pageNum, limit: limitNum } = pagination.value;
+
+  const skip = (pageNum - 1) * limitNum;
 
   const vendors = await Vendor.find({ isVerified: false })
     .populate('user', 'firstName lastName email phone')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: -1 });
 
 
@@ -95,8 +110,8 @@ exports.getPendingVendors = asyncHandler(async (req, res) => {
     success: true,
     count: vendors.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: vendors,
   });
 });
@@ -256,19 +271,26 @@ exports.toggleUserStatus = asyncHandler(async (req, res) => {
 exports.getAllBookings = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
 
+  const pagination = validatePagination(page, limit, 50);
+  if (!pagination.valid) {
+    res.status(400);
+    throw new Error(pagination.error);
+  }
+  const { page: pageNum, limit: limitNum } = pagination.value;
+
   let filter = {};
   if (status) {
     filter.bookingStatus = status;
   }
 
-  const skip = (page - 1) * limit;
+  const skip = (pageNum - 1) * limitNum;
 
   const bookings = await Booking.find(filter)
     .populate('user', 'firstName lastName email')
     .populate('vendor', 'businessName')
     .populate('service')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: -1 });
 
   const total = await Booking.countDocuments(filter);
@@ -277,8 +299,8 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
     success: true,
     count: bookings.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: bookings,
   });
 });
@@ -289,19 +311,26 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
 exports.getAllPayments = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
 
+  const pagination = validatePagination(page, limit, 50);
+  if (!pagination.valid) {
+    res.status(400);
+    throw new Error(pagination.error);
+  }
+  const { page: pageNum, limit: limitNum } = pagination.value;
+
   let filter = {};
   if (status) {
     filter.paymentStatus = status;
   }
 
-  const skip = (page - 1) * limit;
+  const skip = (pageNum - 1) * limitNum;
 
   const payments = await Payment.find(filter)
     .populate('user', 'firstName lastName email')
     .populate('vendor', 'businessName')
     .populate('booking')
     .skip(skip)
-    .limit(parseInt(limit))
+    .limit(limitNum)
     .sort({ createdAt: -1 });
 
   const total = await Payment.countDocuments(filter);
@@ -310,8 +339,8 @@ exports.getAllPayments = asyncHandler(async (req, res) => {
     success: true,
     count: payments.length,
     total,
-    pages: Math.ceil(total / limit),
-    currentPage: page,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
     data: payments,
   });
 });
