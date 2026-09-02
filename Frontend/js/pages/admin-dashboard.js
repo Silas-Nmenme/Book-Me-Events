@@ -182,7 +182,7 @@ async function renderUsers() {
   try {
     // Default: show all roles (no role filter)
     const data = await loadUsers();
-    const users = data?.data || [];
+    const users = data?.data || data?.results || data || [];
 
     if (!Array.isArray(users) || users.length === 0) {
       bodyEl.innerHTML = `<tr><td colspan="5" class="text-muted-soft">No users found.</td></tr>`;
