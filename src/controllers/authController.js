@@ -96,7 +96,7 @@ exports.register = asyncHandler(async (req, res) => {
   user.otpVerifiedAt = undefined;
   await user.save();
 
-  // Send verification email (best-effort)
+  // Send verification email (best-effort, but log failures since sendEmail never throws)
   try {
     const { subject, text, html } = otpVerificationEmail({
       firstName: user.firstName,
@@ -105,12 +105,17 @@ exports.register = asyncHandler(async (req, res) => {
       purposeLabel: 'account verification',
     });
 
-    await sendEmail({
+    const emailResult = await sendEmail({
       to: user.email,
       subject,
       text,
       html,
     });
+
+    if (!emailResult.success) {
+      // eslint-disable-next-line no-console
+      console.error('OTP email failed to send:', emailResult.error || emailResult.message);
+    }
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('OTP email failed:', err.message);

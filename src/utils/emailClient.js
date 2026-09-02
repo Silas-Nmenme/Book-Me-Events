@@ -112,6 +112,8 @@ const sendEmail = async ({ to, subject, text, html } = {}) => {
     return { success: true };
   } catch (error) {
     console.error(`Email send failed: ${error.message}`);
+    // Drop the pooled connection so the next send attempt reconnects fresh.
+    transporter = null;
     return { success: false, error: error.message };
   }
 };
