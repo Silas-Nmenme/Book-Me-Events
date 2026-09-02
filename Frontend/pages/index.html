@@ -24,10 +24,23 @@
           </span>
         </a>
 
+        <button
+          class="navbar-toggler ms-auto me-2 d-lg-none"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navPublicContent"
+          aria-controls="navPublicContent"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
         <div class="d-flex gap-2 align-items-center ms-auto">
-          <div class="d-none d-lg-flex gap-2 align-items-center">
+          <div id="navPublicContent" class="collapse navbar-collapse gap-2 align-items-center">
             <a class="bme-nav-link" href="#howItWorks">How it works</a>
             <a class="bme-nav-link" href="#categories">Browse</a>
+            <a class="bme-nav-link" href="vendor-register-page1.html">For vendors</a>
             <a class="bme-nav-link" href="auth-login.html">Login</a>
             <a class="btn btn-brand" href="auth-register.html">Get Started</a>
           </div>
@@ -55,7 +68,7 @@
           <div class="row g-4 align-items-center">
             <div class="col-lg-7">
               <div class="d-inline-flex align-items-center gap-3 mb-3">
-                <span class="bme-kicker" style="background: rgba(124,58,237,.12); border-color: rgba(124,58,237,.35)">
+                <span class="bme-kicker">
                   <span class="dot" aria-hidden="true"></span>
                   <span class="fw-semibold">Nigerian event marketplace</span>
                 </span>
@@ -99,8 +112,8 @@
               <form id="landingSearchForm" class="bme-search-row mt-4">
                 <div class="row g-2 align-items-end">
                   <div class="col-12 col-md-4">
-                    <label class="form-label small text-muted-soft">City</label>
-                    <select class="form-select" name="city">
+                    <label class="form-label small text-muted-soft" for="landingSearchCity">City</label>
+                    <select class="form-select" id="landingSearchCity" name="city">
                       <option value="">Select city</option>
                       <option value="Lagos">Lagos</option>
                       <option value="Abuja">Abuja</option>
@@ -109,8 +122,8 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-4">
-                    <label class="form-label small text-muted-soft">Event type</label>
-                    <select class="form-select" name="type">
+                    <label class="form-label small text-muted-soft" for="landingSearchType">Event type</label>
+                    <select class="form-select" id="landingSearchType" name="type">
                       <option value="">Select type</option>
                       <option value="weddings">Weddings</option>
                       <option value="concerts">Concerts</option>
@@ -119,8 +132,8 @@
                     </select>
                   </div>
                   <div class="col-12 col-md-3">
-                    <label class="form-label small text-muted-soft">Date</label>
-                    <input class="form-control" type="date" name="date" />
+                    <label class="form-label small text-muted-soft" for="landingSearchDate">Date</label>
+                    <input class="form-control" id="landingSearchDate" type="date" name="date" />
                   </div>
                   <div class="col-12 col-md-1 d-grid">
                     <button class="btn btn-brand btn-hero-primary btn-lg" type="submit" aria-label="Search">
@@ -164,6 +177,46 @@
       </section>
 
 
+      <!-- WHY BOOK ME EVENTS -->
+      <section class="section pt-0">
+        <div class="container">
+          <div class="mb-4">
+            <h2 class="fw-bold">Why plan with Book Me Events</h2>
+            <div class="text-muted-soft">Everything you need to hire the right vendor, without the back-and-forth.</div>
+          </div>
+          <div class="row g-3">
+            <div class="col-12 col-md-6 col-lg-3">
+              <div class="bme-feature-card">
+                <div class="bme-feature-card__icon">✅</div>
+                <div class="fw-bold mb-1">Verified vendors</div>
+                <div class="text-muted-soft small">Every vendor is KYC-checked before they can accept bookings.</div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <div class="bme-feature-card">
+                <div class="bme-feature-card__icon">💬</div>
+                <div class="fw-bold mb-1">Real-time chat</div>
+                <div class="text-muted-soft small">Discuss requirements and confirm details directly in-app.</div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <div class="bme-feature-card">
+                <div class="bme-feature-card__icon">🔒</div>
+                <div class="fw-bold mb-1">Secure payments</div>
+                <div class="text-muted-soft small">Pay safely and track every booking from request to completion.</div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <div class="bme-feature-card">
+                <div class="bme-feature-card__icon">⭐</div>
+                <div class="fw-bold mb-1">Real reviews</div>
+                <div class="text-muted-soft small">Ratings come only from users with a completed booking.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- CATEGORY GRID -->
       <section id="categories" class="section">
         <div class="container">
@@ -189,7 +242,7 @@
                   <div class="bme-emoji">🎛️</div>
                   <div class="flex-grow-1">
                     <div class="fw-bold">DJs</div>
-                    <div class="bme-badge">1,200 vendors available</div>
+                    <div class="bme-badge" data-category-count="djs">—</div>
                   </div>
                 </div>
               </a>
@@ -200,7 +253,7 @@
                   <div class="bme-emoji">🍽️</div>
                   <div class="flex-grow-1">
                     <div class="fw-bold">Caterers</div>
-                    <div class="bme-badge">340 vendors available</div>
+                    <div class="bme-badge" data-category-count="caterers">—</div>
                   </div>
                 </div>
               </a>
@@ -211,7 +264,7 @@
                   <div class="bme-emoji">📸</div>
                   <div class="flex-grow-1">
                     <div class="fw-bold">Photographers</div>
-                    <div class="bme-badge">180 vendors available</div>
+                    <div class="bme-badge" data-category-count="photographers">—</div>
                   </div>
                 </div>
               </a>
@@ -222,7 +275,7 @@
                   <div class="bme-emoji">🎤</div>
                   <div class="flex-grow-1">
                     <div class="fw-bold">MCs</div>
-                    <div class="bme-badge">210 vendors available</div>
+                    <div class="bme-badge" data-category-count="mcs">—</div>
                   </div>
                 </div>
               </a>
@@ -234,7 +287,7 @@
                   <div class="bme-emoji">🎨</div>
                   <div class="flex-grow-1">
                     <div class="fw-bold">Decorators</div>
-                    <div class="bme-badge">260 vendors available</div>
+                    <div class="bme-badge" data-category-count="decorators">—</div>
                   </div>
                 </div>
               </a>
@@ -245,7 +298,7 @@
                   <div class="bme-emoji">🛡️</div>
                   <div class="flex-grow-1">
                     <div class="fw-bold">Security</div>
-                    <div class="bme-badge">95 vendors available</div>
+                    <div class="bme-badge" data-category-count="security">—</div>
                   </div>
                 </div>
               </a>
@@ -256,7 +309,7 @@
                   <div class="bme-emoji">🗓️</div>
                   <div class="flex-grow-1">
                     <div class="fw-bold">Planners</div>
-                    <div class="bme-badge">75 vendors available</div>
+                    <div class="bme-badge" data-category-count="planners">—</div>
                   </div>
                 </div>
               </a>
@@ -267,7 +320,7 @@
                   <div class="bme-emoji">🏟️</div>
                   <div class="flex-grow-1">
                     <div class="fw-bold">Venues</div>
-                    <div class="bme-badge">120 vendors available</div>
+                    <div class="bme-badge" data-category-count="venues">—</div>
                   </div>
                 </div>
               </a>
@@ -308,7 +361,7 @@
 
                 <div id="landingCreateReviewCardInner">
                   <div class="mb-3">
-                    <label class="form-label fw-bold">Booking</label>
+                    <label class="form-label fw-bold" for="landingReviewBookingSelect">Booking</label>
                     <select id="landingReviewBookingSelect" class="form-select" disabled>
                       <option value="">Login to create a review</option>
                     </select>
@@ -380,6 +433,20 @@
         </div>
       </section>
 
+      <!-- FINAL CTA -->
+      <section class="section pt-0">
+        <div class="container">
+          <div class="bme-cta-banner">
+            <h2 class="fw-bold mb-2">Ready to plan your next event?</h2>
+            <p class="mb-4">Join thousands of Nigerians booking trusted vendors every week.</p>
+            <div class="d-flex flex-wrap justify-content-center gap-2">
+              <a href="auth-register.html" class="btn btn-light fw-bold">Get Started</a>
+              <a href="vendor-register-page1.html" class="btn btn-outline-light">Become a vendor</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- FOOTER (required 4-column) -->
       <footer class="pt-5 pb-4">
         <div class="container">
@@ -393,6 +460,7 @@
               <div class="d-flex flex-column gap-2 small">
                 <a href="#howItWorks">How it works</a>
                 <a href="services.html">Browse</a>
+                <a href="vendor-register-page1.html">For vendors</a>
                 <a href="auth-login.html">Login</a>
                 <a href="auth-register.html">Get Started</a>
               </div>

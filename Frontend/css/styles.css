@@ -1,24 +1,25 @@
 /* Basic theme for Book Me Events */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 :root {
   /* ===== Required Color System (replace navy/white completely) ===== */
-  --clr-primary: #7C3AED;       /* Event Purple — buttons, active states */
-  --clr-primary-light: #EDE9FE; /* purple tint backgrounds */
-  --clr-accent: #F59E0B;       /* Spotlight Amber — highlights, badges */
-  --clr-highlight: #EC4899;    /* Fuchsia Pop — CTAs, hover rings */
-  --clr-teal: #14B8A6;         /* Stage Teal — success, confirmed */
-  --clr-dark: #0F172A;         /* Deep Night — dark mode bg */
-  --clr-dark-card: #1E293B;    /* dark mode card bg */
-  --clr-surface: #F8F7FF;      /* light mode page bg */
-  --clr-text: #1E1B4B;         /* dark text on light bg */
+  --clr-primary: #0F766E;       /* Stage teal — primary actions */
+  --clr-primary-light: #CCFBF1; /* teal tint backgrounds */
+  --clr-accent: #F59E0B;        /* Spotlight amber — highlights */
+  --clr-highlight: #F97316;     /* Warm coral — emphasis and hover */
+  --clr-teal: #14B8A6;          /* Confirmed and success states */
+  --clr-dark: #111827;          /* Ink — dark mode background */
+  --clr-dark-card: #1F2937;     /* dark mode card background */
+  --clr-surface: #F5F7F6;       /* light mode page background */
+  --clr-text: #17211F;          /* dark text on light background */
   --clr-muted: #6B7280;        /* secondary text */
 
   /* Back-compat semantic tokens used across the existing app */
   --brand: var(--clr-primary);
   --brand2: var(--clr-teal);
 
-  --font-body: "Plus Jakarta Sans", "DM Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  --font-headings: "Syne", "Clash Display", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-headings: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 
   /* Default (dark) theme variables */
   --bg: var(--clr-dark);
@@ -763,5 +764,135 @@ html[data-theme="light"] .bme-empty-state__icon { background: var(--clr-primary-
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* -------------------------------------------------------------------------
+   Product surface refinements
+   ------------------------------------------------------------------------- */
+:root {
+  --page-gutter: clamp(1rem, 3vw, 2.5rem);
+  --content-width: 1240px;
+  --surface-strong: #253342;
+}
+
+html[data-theme="light"] { --surface-strong: #ffffff; }
+
+body {
+  min-width: 320px;
+  background-image:
+    linear-gradient(135deg, rgba(15, 118, 110, .08), transparent 38%),
+    linear-gradient(315deg, rgba(249, 115, 22, .05), transparent 34%);
+}
+
+.container { max-width: var(--content-width); }
+.section { padding-inline: var(--page-gutter); }
+
+.btn:disabled,
+.btn.disabled { cursor: not-allowed; opacity: .55; transform: none; }
+
+.form-label { color: var(--text); font-weight: var(--fw-semibold); margin-bottom: .45rem; }
+.form-control:disabled,
+.form-select:disabled { cursor: not-allowed; opacity: .65; }
+
+.navbar-glass {
+  border-bottom: 1px solid var(--surfaceBorder) !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .08);
+}
+
+.brand-pill {
+  background: rgba(15, 118, 110, .12);
+  border-color: rgba(15, 118, 110, .34);
+  font-size: .92rem;
+}
+
+.brand-dot {
+  background: var(--gradient-primary);
+  box-shadow: 0 0 0 4px rgba(15, 118, 110, .18);
+}
+
+/* Shared shell for the vendor and admin pages, which historically used a
+   different visual structure from the user dashboard. */
+.bme-role-dashboard {
+  background-color: var(--bg);
+}
+
+.bme-role-dashboard > .section {
+  padding-top: clamp(2rem, 5vw, 4.5rem);
+}
+
+.bme-role-dashboard > .section > .container > .row > [class*="col-"] > .card-glass {
+  height: 100%;
+}
+
+.bme-role-dashboard .card-glass {
+  box-shadow: var(--shadow-sm);
+}
+
+.bme-role-dashboard .card-glass .card-glass {
+  background: rgba(37, 51, 66, .55) !important;
+  box-shadow: none;
+}
+
+.bme-role-dashboard .card-glass .card-glass:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.bme-role-dashboard #statsStrip {
+  border-top: 1px solid var(--surfaceBorder);
+  border-bottom: 1px solid var(--surfaceBorder);
+  padding-block: 1rem;
+}
+
+.bme-role-dashboard #statsStrip > [class*="col-"] {
+  min-width: 0;
+}
+
+.bme-role-dashboard .bme-stat-card {
+  min-height: 108px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.bme-role-dashboard .table-responsive {
+  border: 1px solid var(--surfaceBorder);
+  border-radius: var(--radius-md);
+}
+
+.bme-role-dashboard .table { min-width: 640px; margin-bottom: 0; }
+.bme-role-dashboard .table thead th { white-space: nowrap; }
+
+.bme-sidebar {
+  border-right-color: var(--surfaceBorder) !important;
+  box-shadow: 8px 0 28px rgba(15, 23, 42, .08);
+}
+
+.bme-sidebar .bme-nav-link {
+  color: var(--mutedText);
+  font-weight: var(--fw-semibold);
+}
+
+.bme-sidebar .bme-nav-link.active {
+  background: var(--clr-primary);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(15, 118, 110, .26);
+}
+
+.bme-main { min-width: 0; }
+.bme-topbar { border-left: 0 !important; border-right: 0 !important; }
+
+@media (max-width: 767.98px) {
+  .bme-role-dashboard > .section { padding-top: 1.5rem; }
+  .bme-role-dashboard .navbar .container { padding-inline: var(--page-gutter); }
+  .bme-role-dashboard .navbar-collapse { padding-top: .75rem; }
+  .bme-role-dashboard .navbar-collapse > div { justify-content: stretch !important; }
+  .bme-role-dashboard .navbar-collapse .btn,
+  .bme-role-dashboard .navbar-collapse .dropdown { flex: 1 1 auto; }
+  .bme-role-dashboard .navbar-collapse .dropdown > .btn { width: 100%; }
+  .bme-role-dashboard .card-glass { padding: 1.1rem !important; }
+}
+
+@media (min-width: 769px) {
+  .bme-dashboard .bme-main > .section > .container { padding-inline: var(--page-gutter); }
 }
 

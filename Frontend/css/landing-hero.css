@@ -1,5 +1,23 @@
 /* Landing page (index.html) scoped styles — extracted from inline <style> for cacheability */
 
+/* Small CTA pill (index.html loads this file instead of landing-professional.css) */
+.bme-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, .12);
+  border: 1px solid rgba(124, 58, 237, .35);
+}
+.bme-kicker .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--clr-primary), var(--clr-highlight));
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, .18);
+}
+
 .bme-navbar {
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
@@ -297,6 +315,47 @@ footer {
 }
 footer a { color: rgba(255,255,255,.85); text-decoration: none; }
 footer a:hover { color: #fff; }
+
+/* Feature highlights ("Why Book Me Events") */
+.bme-feature-card {
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  height: 100%;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.04);
+  transition: transform var(--dur-base) var(--ease-standard), border-color var(--dur-base) var(--ease-standard);
+}
+html[data-theme="light"] .bme-feature-card {
+  background: rgba(255,255,255,.78);
+  border-color: rgba(15,23,42,.10);
+}
+.bme-feature-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(124,58,237,.4);
+}
+.bme-feature-card__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(124,58,237,.14);
+  border: 1px solid rgba(124,58,237,.3);
+  font-size: 22px;
+  margin-bottom: 14px;
+}
+
+/* Final conversion banner before footer */
+.bme-cta-banner {
+  border-radius: var(--radius-xl);
+  padding: 48px 32px;
+  text-align: center;
+  background: var(--gradient-primary);
+  color: #fff;
+}
+.bme-cta-banner h2 { color: #fff; }
+.bme-cta-banner p { color: rgba(255,255,255,.85); }
 
 /* Reduce motion */
 @media (prefers-reduced-motion: reduce) {

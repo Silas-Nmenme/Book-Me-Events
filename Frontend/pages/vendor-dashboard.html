@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="../css/landing-professional.css" />
   </head>
 
-  <body>
+  <body class="bme-role-dashboard bme-vendor-page">
 <div id="toastHost" class="bme-toast-host p-3"></div>
 
     <nav class="navbar navbar-dark navbar-glass sticky-top bme-navbar">
@@ -35,7 +35,11 @@
 
         <div id="navVendorDashboardContent" class="collapse navbar-collapse">
           <div class="ms-auto d-flex gap-2 align-items-center justify-content-end flex-wrap">
+            <a class="btn btn-soft" href="vendor-dashboard.html" aria-current="page">Dashboard</a>
             <a class="btn btn-soft" href="services.html">Browse</a>
+            <a class="btn btn-soft" href="vendor-service.html">Requests</a>
+            <a class="btn btn-soft" href="bookings.html">Bookings</a>
+            <a class="btn btn-soft" href="messages.html">Messages</a>
 
             <div class="dropdown">
               <button
@@ -275,8 +279,8 @@
 
                     </div>
                     <div class="col-12 col-md-6">
-                      <label class="form-label">Price currency</label>
-                      <input class="form-control" type="text" id="vendorPriceCurrency" value="NGN" />
+                      <label class="form-label" for="vendorPriceCurrency">Price currency</label>
+                      <input class="form-control" type="text" id="vendorPriceCurrency" value="NGN" placeholder="e.g. NGN" title="Price currency" aria-label="Price currency" />
                     </div>
 
                     <div class="col-12">
