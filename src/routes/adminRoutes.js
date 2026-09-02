@@ -5,6 +5,7 @@ const {
   getDashboard,
   getAllUsers,
   getPendingVendors,
+  getAllVendors,
   verifyVendor,
   rejectVendor,
   toggleUserStatus,
@@ -25,6 +26,7 @@ router.get('/dashboard', getDashboard);
 router.get('/users', getAllUsers);
 
 // Vendor management
+router.get('/vendors', getAllVendors);
 router.get('/vendors/pending', getPendingVendors);
 router.put('/vendors/:id/verify', verifyVendor);
 router.put('/vendors/:id/reject', rejectVendor);

@@ -31,6 +31,10 @@ exports.getDashboard = asyncHandler(async (req, res) => {
     { $group: { _id: null, avg: { $avg: '$rating' } } },
   ]);
 
+  const pendingVendors = await Vendor.countDocuments({ kycStatus: 'PENDING' });
+  const activeUsers = await User.countDocuments({ isActive: true });
+  const disabledUsers = await User.countDocuments({ isActive: false });
+
   res.status(200).json({
     success: true,
     data: {
@@ -40,6 +44,9 @@ exports.getDashboard = asyncHandler(async (req, res) => {
       completedBookings,
       totalRevenue: totalRevenue[0]?.total || 0,
       averageRating: averageRating[0]?.avg.toFixed(1) || 0,
+      pendingVendors,
+      activeUsers,
+      disabledUsers,
     },
   });
 });
@@ -48,13 +55,23 @@ exports.getDashboard = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/admin/users
 // @access  Private/Admin
 exports.getAllUsers = asyncHandler(async (req, res) => {
-  const { role, page = 1, limit = 10 } = req.query;
+  const { role, search, page = 1, limit = 10 } = req.query;
 
   const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
 
   let filter = {};
-  if (role) {
-    filter.role = role;
+  if (role && role.toString().toUpperCase() !== 'ALL') {
+    filter.role = role.toString().toUpperCase();
+  }
+
+  if (search) {
+    // Escape regex metacharacters to avoid ReDoS/injection via search input.
+    const safeSearch = search.toString().trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.$or = [
+      { firstName: { $regex: safeSearch, $options: 'i' } },
+      { lastName: { $regex: safeSearch, $options: 'i' } },
+      { email: { $regex: safeSearch, $options: 'i' } },
+    ];
   }
 
   const skip = (pageNum - 1) * limitNum;
@@ -95,6 +112,46 @@ exports.getPendingVendors = asyncHandler(async (req, res) => {
 
 
   const total = await Vendor.countDocuments({ isVerified: false });
+
+  res.status(200).json({
+    success: true,
+    count: vendors.length,
+    total,
+    pages: Math.ceil(total / limitNum),
+    currentPage: pageNum,
+    data: vendors,
+  });
+});
+
+// @desc    Get all vendors (any KYC status), with optional search & status filter
+// @route   GET /api/v1/admin/vendors
+// @access  Private/Admin
+exports.getAllVendors = asyncHandler(async (req, res) => {
+  const { status, search, page = 1, limit = 10 } = req.query;
+
+  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
+
+  let filter = {};
+  const normalizedStatus = status?.toString().toUpperCase();
+  if (normalizedStatus && ['PENDING', 'APPROVED', 'REJECTED'].includes(normalizedStatus)) {
+    filter.kycStatus = normalizedStatus;
+  }
+
+  if (search) {
+    // Escape regex metacharacters to avoid ReDoS/injection via search input.
+    const safeSearch = search.toString().trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.businessName = { $regex: safeSearch, $options: 'i' };
+  }
+
+  const skip = (pageNum - 1) * limitNum;
+
+  const vendors = await Vendor.find(filter)
+    .populate('user', 'firstName lastName email phone isActive')
+    .skip(skip)
+    .limit(limitNum)
+    .sort({ createdAt: -1 });
+
+  const total = await Vendor.countDocuments(filter);
 
   res.status(200).json({
     success: true,
