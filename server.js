@@ -8,6 +8,8 @@ const mongoose = require('mongoose');
 const app = require('./app');
 const connectDB = require('./src/config/db');
 const User = require('./src/models/User');
+const Request = require('./src/models/Request');
+const Vendor = require('./src/models/Vendor');
 
 
 const PORT = process.env.PORT || 5000;
@@ -82,6 +84,26 @@ const startServer = async () => {
         }
 
         socket.join(`user:${requested}`);
+      });
+
+      socket.on('join:request', async ({ requestId } = {}) => {
+        if (!requestId || !mongoose.Types.ObjectId.isValid(String(requestId))) return;
+
+        const request = await Request.findById(requestId).select('user vendor').lean();
+        if (!request) return;
+
+        const ownId = String(socket.userFull._id);
+        const isOwner = String(request.user) === ownId;
+        let isAssignedVendor = false;
+
+        if (request.vendor) {
+          const vendor = await Vendor.findById(request.vendor).select('user').lean();
+          isAssignedVendor = String(vendor?.user) === ownId;
+        }
+
+        if (socket.userFull.role === 'ADMIN' || isOwner || isAssignedVendor) {
+          socket.join(`chat:${requestId}`);
+        }
       });
     });
 

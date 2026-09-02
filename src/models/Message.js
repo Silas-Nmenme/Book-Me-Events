@@ -4,6 +4,7 @@ const messageSchema = new mongoose.Schema(
   {
     sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    request: { type: mongoose.Schema.Types.ObjectId, ref: 'Request', index: true },
     booking: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
     subject: { type: String },
     messageContent: { type: String, required: true },

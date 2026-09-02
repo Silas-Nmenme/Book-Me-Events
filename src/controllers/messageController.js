@@ -243,8 +243,7 @@ exports.sendMessageByRequestId = asyncHandler(async (req, res) => {
       request: requestId,
     };
 
-    io.to(`user:${req.user.id}`).emit('message:new', payload);
-    io.to(`user:${recipient}`).emit('message:new', payload);
+    io.to(`chat:${requestId}`).emit('message:new', payload);
   }
 
 
