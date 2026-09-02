@@ -11,6 +11,11 @@ const {
   vendorVerificationRejectedEmail,
 } = require('../utils/emailTemplates');
 const { validatePagination } = require('../utils/inputValidator');
+const { toCsv, sendCsv } = require('../utils/csvExport');
+
+function escapeRegex(str) {
+  return str.toString().trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 
 
@@ -413,6 +418,26 @@ exports.getPlatformStats = asyncHandler(async (req, res) => {
     { $sort: { _id: 1 } },
   ]);
 
+  const monthlySignups = await User.aggregate([
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const monthlyBookings = await Booking.aggregate([
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
   res.status(200).json({
     success: true,
     data: {
@@ -420,6 +445,8 @@ exports.getPlatformStats = asyncHandler(async (req, res) => {
       paymentsByStatus,
       topVendors,
       monthlyRevenue,
+      monthlySignups,
+      monthlyBookings,
     },
   });
 });
@@ -467,6 +494,296 @@ exports.sendAnnouncement = asyncHandler(async (req, res) => {
     success: true,
     message: 'Announcement sent successfully',
     data: announcements.length === 1 ? announcements[0] : announcements,
+  });
+});
+
+// Export cap: prevents unbounded CSV generation from taking down the process.
+const MAX_EXPORT_ROWS = 5000;
+
+// @desc    Export users as CSV (respects same filters as getAllUsers)
+// @route   GET /api/v1/admin/users/export
+// @access  Private/Admin
+exports.exportUsersCsv = asyncHandler(async (req, res) => {
+  const { role, search } = req.query;
+
+  let filter = {};
+  if (role && role.toString().toUpperCase() !== 'ALL') {
+    filter.role = role.toString().toUpperCase();
+  }
+  if (search) {
+    const safeSearch = escapeRegex(search);
+    filter.$or = [
+      { firstName: { $regex: safeSearch, $options: 'i' } },
+      { lastName: { $regex: safeSearch, $options: 'i' } },
+      { email: { $regex: safeSearch, $options: 'i' } },
+    ];
+  }
+
+  const users = await User.find(filter)
+    .select('firstName lastName email phone role isActive isVerified createdAt')
+    .sort({ createdAt: -1 })
+    .limit(MAX_EXPORT_ROWS);
+
+  const csv = toCsv(
+    [
+      { key: 'firstName', label: 'First Name' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'email', label: 'Email' },
+      { key: 'phone', label: 'Phone' },
+      { key: 'role', label: 'Role' },
+      { label: 'Status', value: (u) => (u.isActive ? 'Active' : 'Disabled') },
+      { label: 'Verified', value: (u) => (u.isVerified ? 'Yes' : 'No') },
+      { label: 'Joined', value: (u) => new Date(u.createdAt).toISOString() },
+    ],
+    users
+  );
+
+  sendCsv(res, `users-export-${Date.now()}.csv`, csv);
+});
+
+// @desc    Export vendors as CSV (respects same filters as getAllVendors)
+// @route   GET /api/v1/admin/vendors/export
+// @access  Private/Admin
+exports.exportVendorsCsv = asyncHandler(async (req, res) => {
+  const { status, search } = req.query;
+
+  let filter = {};
+  const normalizedStatus = status?.toString().toUpperCase();
+  if (normalizedStatus && ['PENDING', 'APPROVED', 'REJECTED'].includes(normalizedStatus)) {
+    filter.kycStatus = normalizedStatus;
+  }
+  if (search) {
+    filter.businessName = { $regex: escapeRegex(search), $options: 'i' };
+  }
+
+  const vendors = await Vendor.find(filter)
+    .populate('user', 'firstName lastName email phone')
+    .sort({ createdAt: -1 })
+    .limit(MAX_EXPORT_ROWS);
+
+  const csv = toCsv(
+    [
+      { label: 'Business Name', value: (v) => v.businessName },
+      { label: 'Owner', value: (v) => `${v.user?.firstName || ''} ${v.user?.lastName || ''}`.trim() },
+      { label: 'Email', value: (v) => v.user?.email || '' },
+      { label: 'Phone', value: (v) => v.user?.phone || '' },
+      { label: 'KYC Status', value: (v) => v.kycStatus },
+      { label: 'Rating', value: (v) => v.rating },
+      { label: 'Total Bookings', value: (v) => v.totalBookings },
+      { label: 'Joined', value: (v) => new Date(v.createdAt).toISOString() },
+    ],
+    vendors
+  );
+
+  sendCsv(res, `vendors-export-${Date.now()}.csv`, csv);
+});
+
+// @desc    Export bookings as CSV (respects same status filter as getAllBookings)
+// @route   GET /api/v1/admin/bookings/export
+// @access  Private/Admin
+exports.exportBookingsCsv = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+
+  let filter = {};
+  if (status) filter.bookingStatus = status;
+
+  const bookings = await Booking.find(filter)
+    .populate('user', 'firstName lastName email')
+    .populate('vendor', 'businessName')
+    .populate('service', 'serviceName name')
+    .sort({ createdAt: -1 })
+    .limit(MAX_EXPORT_ROWS);
+
+  const csv = toCsv(
+    [
+      { label: 'Booking ID', value: (b) => b._id.toString() },
+      { label: 'Customer', value: (b) => `${b.user?.firstName || ''} ${b.user?.lastName || ''}`.trim() },
+      { label: 'Customer Email', value: (b) => b.user?.email || '' },
+      { label: 'Vendor', value: (b) => b.vendor?.businessName || '' },
+      { label: 'Service', value: (b) => b.service?.serviceName || b.service?.name || '' },
+      { label: 'Status', value: (b) => b.bookingStatus },
+      { label: 'Amount', value: (b) => b.totalAmount },
+      { label: 'Created', value: (b) => new Date(b.createdAt).toISOString() },
+    ],
+    bookings
+  );
+
+  sendCsv(res, `bookings-export-${Date.now()}.csv`, csv);
+});
+
+// @desc    Export payments as CSV (respects same status filter as getAllPayments)
+// @route   GET /api/v1/admin/payments/export
+// @access  Private/Admin
+exports.exportPaymentsCsv = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+
+  let filter = {};
+  if (status) filter.paymentStatus = status;
+
+  const payments = await Payment.find(filter)
+    .populate('user', 'firstName lastName email')
+    .populate('vendor', 'businessName')
+    .sort({ createdAt: -1 })
+    .limit(MAX_EXPORT_ROWS);
+
+  const csv = toCsv(
+    [
+      { label: 'Payment ID', value: (p) => p._id.toString() },
+      { label: 'Customer', value: (p) => `${p.user?.firstName || ''} ${p.user?.lastName || ''}`.trim() },
+      { label: 'Customer Email', value: (p) => p.user?.email || '' },
+      { label: 'Vendor', value: (p) => p.vendor?.businessName || '' },
+      { label: 'Amount', value: (p) => p.amount },
+      { label: 'Status', value: (p) => p.paymentStatus },
+      { label: 'Transaction Reference', value: (p) => p.transactionReference },
+      { label: 'Created', value: (p) => new Date(p.createdAt).toISOString() },
+    ],
+    payments
+  );
+
+  sendCsv(res, `payments-export-${Date.now()}.csv`, csv);
+});
+
+// Bulk action cap: keeps a single request from mutating an unbounded number of records.
+const MAX_BULK_IDS = 200;
+
+// @desc    Bulk enable/disable users
+// @route   PUT /api/v1/admin/users/bulk-toggle-status
+// @access  Private/Admin
+exports.bulkToggleUserStatus = asyncHandler(async (req, res) => {
+  const { userIds, isActive } = req.body || {};
+
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    res.status(400);
+    throw new Error('userIds must be a non-empty array');
+  }
+  if (typeof isActive !== 'boolean') {
+    res.status(400);
+    throw new Error('isActive must be a boolean');
+  }
+
+  const safeIds = userIds.slice(0, MAX_BULK_IDS).filter((id) => /^[a-f0-9]{24}$/i.test(id));
+
+  const result = await User.updateMany({ _id: { $in: safeIds } }, { $set: { isActive } });
+
+  res.status(200).json({
+    success: true,
+    message: `${result.modifiedCount} user(s) ${isActive ? 'enabled' : 'disabled'} successfully`,
+    modifiedCount: result.modifiedCount,
+  });
+});
+
+// @desc    Bulk verify or reject vendors
+// @route   PUT /api/v1/admin/vendors/bulk-action
+// @access  Private/Admin
+exports.bulkVendorAction = asyncHandler(async (req, res) => {
+  const { vendorIds, action, reason } = req.body || {};
+
+  if (!Array.isArray(vendorIds) || vendorIds.length === 0) {
+    res.status(400);
+    throw new Error('vendorIds must be a non-empty array');
+  }
+  if (action !== 'verify' && action !== 'reject') {
+    res.status(400);
+    throw new Error('action must be "verify" or "reject"');
+  }
+
+  const safeIds = vendorIds.slice(0, MAX_BULK_IDS).filter((id) => /^[a-f0-9]{24}$/i.test(id));
+  const vendors = await Vendor.find({ _id: { $in: safeIds } }).populate('user', 'firstName lastName email');
+
+  let processed = 0;
+  for (const vendor of vendors) {
+    if (action === 'verify') {
+      vendor.isVerified = true;
+      vendor.verificationDate = new Date();
+      vendor.kycStatus = 'APPROVED';
+      vendor.kycReviewedAt = new Date();
+      vendor.kycReviewedBy = req.user?.id || undefined;
+    } else {
+      vendor.isVerified = false;
+      vendor.kycStatus = 'REJECTED';
+      vendor.kycReviewReason = reason || 'Not provided';
+      vendor.kycReviewedAt = new Date();
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await vendor.save();
+    processed += 1;
+
+    // Best-effort email; failures don't block the bulk operation.
+    if (vendor.user?.email) {
+      try {
+        const templateFn = action === 'verify' ? vendorVerificationSuccessEmail : vendorVerificationRejectedEmail;
+        const { subject, text, html } = templateFn({
+          recipientName: vendor.user?.firstName || vendor.user?.lastName || 'there',
+          vendorBusinessName: vendor.businessName,
+          businessName: vendor.businessName,
+          reason: reason || 'Please review your submission and try again.',
+        });
+        // eslint-disable-next-line no-await-in-loop
+        await sendEmail({ to: vendor.user.email, subject, text, html });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(`Bulk vendor ${action} email failed:`, err.message);
+      }
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `${processed} vendor(s) ${action === 'verify' ? 'verified' : 'rejected'} successfully`,
+    processedCount: processed,
+  });
+});
+
+// @desc    Global search across users, vendors, and bookings
+// @route   GET /api/v1/admin/search?q=
+// @access  Private/Admin
+exports.globalSearch = asyncHandler(async (req, res) => {
+  const q = (req.query.q || '').toString().trim();
+
+  if (!q) {
+    return res.status(200).json({ success: true, data: { users: [], vendors: [], bookings: [] } });
+  }
+
+  const regex = { $regex: escapeRegex(q), $options: 'i' };
+
+  const matchingUsers = await User.find({
+    $or: [{ firstName: regex }, { lastName: regex }, { email: regex }],
+  })
+    .select('firstName lastName email role isActive')
+    .limit(10);
+
+  const vendorsByName = await Vendor.find({ businessName: regex })
+    .populate('user', 'firstName lastName email')
+    .limit(10);
+
+  const matchingUserIds = matchingUsers.map((u) => u._id);
+  const vendorsByOwner = await Vendor.find({ user: { $in: matchingUserIds } })
+    .populate('user', 'firstName lastName email')
+    .limit(10);
+
+  const seenVendorIds = new Set();
+  const vendors = [...vendorsByName, ...vendorsByOwner]
+    .filter((v) => {
+      const id = v._id.toString();
+      if (seenVendorIds.has(id)) return false;
+      seenVendorIds.add(id);
+      return true;
+    })
+    .slice(0, 10);
+
+  const relatedUserIds = [...matchingUserIds, ...vendors.map((v) => v.user?._id).filter(Boolean)];
+
+  const bookings = await Booking.find({ user: { $in: relatedUserIds } })
+    .populate('user', 'firstName lastName email')
+    .populate('vendor', 'businessName')
+    .populate('service', 'serviceName name')
+    .sort({ createdAt: -1 })
+    .limit(10);
+
+  res.status(200).json({
+    success: true,
+    data: { users: matchingUsers, vendors, bookings },
   });
 });
 

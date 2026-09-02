@@ -13,6 +13,13 @@ const {
   getAllPayments,
   getPlatformStats,
   sendAnnouncement,
+  exportUsersCsv,
+  exportVendorsCsv,
+  exportBookingsCsv,
+  exportPaymentsCsv,
+  bulkToggleUserStatus,
+  bulkVendorAction,
+  globalSearch,
 } = require('../controllers/adminController');
 
 
@@ -22,12 +29,19 @@ router.use(protect, authorize('ADMIN'));
 // Dashboard
 router.get('/dashboard', getDashboard);
 
+// Global search
+router.get('/search', globalSearch);
+
 // Users management
 router.get('/users', getAllUsers);
+router.get('/users/export', exportUsersCsv);
+router.put('/users/bulk-toggle-status', bulkToggleUserStatus);
 
 // Vendor management
 router.get('/vendors', getAllVendors);
+router.get('/vendors/export', exportVendorsCsv);
 router.get('/vendors/pending', getPendingVendors);
+router.put('/vendors/bulk-action', bulkVendorAction);
 router.put('/vendors/:id/verify', verifyVendor);
 router.put('/vendors/:id/reject', rejectVendor);
 
@@ -36,9 +50,11 @@ router.put('/users/:id/toggle-status', toggleUserStatus);
 
 // Bookings
 router.get('/bookings', getAllBookings);
+router.get('/bookings/export', exportBookingsCsv);
 
 // Payments
 router.get('/payments', getAllPayments);
+router.get('/payments/export', exportPaymentsCsv);
 
 // Statistics
 router.get('/stats', getPlatformStats);
