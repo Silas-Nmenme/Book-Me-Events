@@ -11,11 +11,7 @@ exports.getServices = asyncHandler(async (req, res) => {
 
   // Validate pagination
   const paginationVal = validatePagination(page, limit, 50);
-  if (!paginationVal.valid) {
-    res.status(400);
-    throw new Error(paginationVal.error);
-  }
-  const { page: pageNum, limit: limitNum } = paginationVal.value;
+  const { page: pageNum, limit: limitNum } = paginationVal;
 
   let filter = { availabilityStatus: 'AVAILABLE' };
 
