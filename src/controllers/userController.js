@@ -18,12 +18,7 @@ exports.getUsers = asyncHandler(async (req, res) => {
   }
 
   // Validate pagination
-  const paginationVal = validatePagination(page, limit, 50);
-  if (!paginationVal.valid) {
-    res.status(400);
-    throw new Error(paginationVal.error);
-  }
-  const { page: pageNum, limit: limitNum } = paginationVal.value;
+  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
 
   const skip = (pageNum - 1) * limitNum;
 
@@ -193,12 +188,7 @@ exports.getUserBookings = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
 
   // Validate pagination
-  const paginationVal = validatePagination(page, limit, 50);
-  if (!paginationVal.valid) {
-    res.status(400);
-    throw new Error(paginationVal.error);
-  }
-  const { page: pageNum, limit: limitNum } = paginationVal.value;
+  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
 
   const skip = (pageNum - 1) * limitNum;
 
