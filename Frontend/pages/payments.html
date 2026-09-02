@@ -205,13 +205,13 @@
           clearToken();
         }
         toast({ title: 'Logged out', message: 'See you again.', variant: 'success' });
-        window.location.href = 'auth-login.html';
+        window.location.replace('auth-login.html');
       });
 
       const me = await fetchMe().catch(() => null);
       if (!me) {
         clearToken();
-        window.location.href = 'auth-login.html';
+        window.location.replace('auth-login.html');
       } else {
         const meData = me?.data || me;
         document.getElementById('meName').textContent = meData?.firstName ? `${meData.firstName} ${meData.lastName || ''}`.trim() : '—';

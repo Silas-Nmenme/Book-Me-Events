@@ -136,7 +136,7 @@
           if (res?.token) localStorage.setItem('bme_token', res.token);
 
           toast({ title: 'Admin verified', message: 'Redirecting to admin dashboard…', variant: 'success' });
-          window.location.href = 'auth-login.html';
+          window.location.replace('auth-login.html');
         } catch (err) {
           hint.textContent = err?.message || 'OTP verification failed.';
           toast({ title: 'Verify failed', message: err?.message || 'Try again.', variant: 'danger' });

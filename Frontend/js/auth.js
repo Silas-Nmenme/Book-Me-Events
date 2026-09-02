@@ -1,9 +1,14 @@
-import { fetchMe, loginUser, logoutUser, registerUser, resetPassword, forgotPassword, setToken, clearToken } from './api.js';
+import { fetchMe, loginUser, logoutUser, registerUser, resetPassword, forgotPassword, setToken, clearToken, getToken } from './api.js';
+
+export function redirectToLogin(redirectTo = 'auth-login.html') {
+  clearToken();
+  window.location.replace(redirectTo);
+}
 
 export function requireAuth(redirectTo = 'auth-login.html') {
-  const token = localStorage.getItem('bme_token');
+  const token = getToken();
   if (!token) {
-    window.location.href = redirectTo;
+    redirectToLogin(redirectTo);
     return false;
   }
   return true;
@@ -34,7 +39,7 @@ export async function logoutFlow() {
     await logoutUser();
   } finally {
     clearToken();
-    window.location.href = 'index.html';
+    window.location.replace('index.html');
   }
 }
 

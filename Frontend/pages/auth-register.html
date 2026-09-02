@@ -169,7 +169,7 @@
           toast({ title: 'OTP sent', message: 'Verify your email OTP to continue.', variant: 'success' });
           // save email temporarily so user can verify OTP
           sessionStorage.setItem('bme_pending_verify_email', email);
-          window.location.href = 'auth-verify-otp.html';
+          window.location.replace('auth-verify-otp.html');
 
         } catch (err) {
           const status = err?.status || err?.response?.status;

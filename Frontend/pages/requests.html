@@ -482,7 +482,7 @@ async function loadMe() {
       variant:'danger'
     });
 
-    window.location.href='auth-login.html';
+    window.location.replace('auth-login.html');
     return null;
   }
 }
@@ -500,7 +500,7 @@ document.getElementById('btnLogout').addEventListener('click', async () => {
     variant:'success'
   });
 
-  window.location.href='auth-login.html';
+  window.location.replace('auth-login.html');
 });
 
 const meRes = await loadMe();

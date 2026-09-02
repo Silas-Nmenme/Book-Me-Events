@@ -147,7 +147,7 @@
 
           toast({ title: 'Vendor verified', message: 'Redirecting to login/dashboard…', variant: 'success' });
           // backend issues JWT; simplest is send them to login which then redirects by role
-          window.location.href = 'auth-login.html';
+          window.location.replace('auth-login.html');
 
         } catch (err) {
           hint.textContent = err?.message || 'OTP verification failed.';

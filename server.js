@@ -11,6 +11,12 @@ const User = require('./src/models/User');
 
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://bookmeevent.netlify.app';
+const allowedOrigins = [...new Set([
+  FRONTEND_URL,
+  'https://bookmeevent.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+].filter(Boolean))];
 
 const startServer = async () => {
   try {
@@ -20,7 +26,7 @@ const startServer = async () => {
 
     const io = new Server(server, {
       cors: {
-        origin: ['https://bookmeevent.netlify.app', 'http://localhost:3000', 'http://localhost:5173'],
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
         credentials: true,
       },

@@ -13,17 +13,27 @@ const {
   otpLimiter,
   forgotPasswordLimiter,
   resetPasswordLimiter,
+  apiLimiter,
 } = require('./src/middlewares/rateLimiters');
 
 // Validate environment at startup
 try {
   validateEnvironment();
 } catch (err) {
-  console.error('❌ Startup failed:', err.message);
+  console.error('Startup failed:', err.message);
   process.exit(1);
 }
 
 const app = express();
+
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+const allowedOrigins = [...new Set([
+  process.env.FRONTEND_URL,
+  'https://bookmeevent.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+].filter(Boolean))];
 
 // Security headers (Helmet)
 app.use(...securityHeaders);
@@ -44,11 +54,13 @@ app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use(morgan('dev'));
 app.use(cors({
-  origin: ['https://bookmeevent.netlify.app', 'http://localhost:3000', 'http://localhost:5173'],
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+app.use('/api/v1', apiLimiter);
 
 // (Optional) Basic rate limits on auth endpoints to prevent brute-force/OTP guessing.
 app.use('/api/v1/auth/login', loginLimiterByIp, loginLimiterByAccount);
@@ -65,6 +77,13 @@ app.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'Book Me Events API is running'
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    status: 'ok'
   });
 });
 

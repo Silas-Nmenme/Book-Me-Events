@@ -1,16 +1,66 @@
 import { BACKEND_URL, TOKEN_KEY } from '../constant.js';
 
+const LEGACY_TOKEN_KEYS = ['token'];
+
+function getStorage() {
+  try {
+    return window?.localStorage ? window.localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+function getLegacyTokenCandidates() {
+  return [TOKEN_KEY, ...LEGACY_TOKEN_KEYS];
+}
+
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || '';
+  const store = getStorage();
+  if (!store) return '';
+
+  for (const key of getLegacyTokenCandidates()) {
+    try {
+      const token = store.getItem(key);
+      if (token && token.trim()) return token.trim();
+    } catch {}
+  }
+
+  try {
+    const sessionToken = sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token');
+    if (sessionToken && sessionToken.trim()) return sessionToken.trim();
+  } catch {}
+
+  return '';
 }
 
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  for (const key of getLegacyTokenCandidates()) {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+    try {
+      sessionStorage.removeItem(key);
+    } catch {}
+  }
 }
 
 export function setToken(token) {
-  if (!token) clearToken();
-  else localStorage.setItem(TOKEN_KEY, token);
+  const normalized = (token || '').toString().trim();
+  if (!normalized) {
+    clearToken();
+    return;
+  }
+
+  const keys = getLegacyTokenCandidates();
+  try {
+    keys.forEach((key) => localStorage.setItem(key, normalized));
+    return;
+  } catch {
+    // Ignore storage quota failures and fall back to temporary in-session storage.
+    try {
+      keys.forEach((key) => sessionStorage.setItem(key, normalized));
+    } catch {}
+  }
 }
 
 export function qs(name) {
@@ -69,6 +119,11 @@ export async function apiFetch(path, options = {}) {
 
     if (!res.ok) {
       const msg = data?.message || data?.error || `Request failed (${res.status})`;
+
+      if (res.status === 401 || res.status === 403) {
+        clearToken();
+      }
+
       const err = new Error(msg);
       err.status = res.status;
       err.data = data;
@@ -83,6 +138,11 @@ export async function apiFetch(path, options = {}) {
       timeoutError.data = { message: timeoutError.message };
       throw timeoutError;
     }
+
+    if (err?.status === 401 || err?.status === 403) {
+      clearToken();
+    }
+
     throw err;
   } finally {
     if (timeoutId) window.clearTimeout(timeoutId);

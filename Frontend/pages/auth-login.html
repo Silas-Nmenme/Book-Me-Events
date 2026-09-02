@@ -154,7 +154,7 @@
             : (roleUpper === 'VENDOR' ? 'vendor-dashboard.html' : 'user-dashboard.html');
 
           toast({ title: 'Logged in', message: 'Redirecting to your dashboard…', variant: 'success' });
-          window.location.href = next;
+          window.location.replace(next);
 
 
 

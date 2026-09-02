@@ -161,7 +161,7 @@
           clearToken();
         }
         toast({ title: 'Logged out', message: 'See you again.', variant: 'success' });
-        window.location.href = 'auth-login.html';
+        window.location.replace('auth-login.html');
       });
 
       const form = document.getElementById('settingsForm');
@@ -207,7 +207,7 @@
         const me = await fetchMe().catch(() => null);
         if (!me) {
           clearToken();
-          window.location.href = 'auth-login.html';
+          window.location.replace('auth-login.html');
           return null;
         }
         const data = me?.data || me;
