@@ -77,7 +77,10 @@ exports.getRequest = asyncHandler(async (req, res) => {
   // Authorization: Users can only see their own requests, Vendors can see requests for their services, Admin can see all
   if (req.user.role !== 'ADMIN') {
     const isOwner = request.user && request.user._id && isResourceOwner(req.user.id, request.user._id);
-    const isVendor = request.vendor && request.vendor._id && request.vendor._id.toString() === req.user._id?.toString();
+    const vendorProfile = req.user.role === 'VENDOR'
+      ? await Vendor.findOne({ user: req.user.id || req.user._id }).select('_id')
+      : null;
+    const isVendor = request.vendor && vendorProfile && request.vendor._id.toString() === vendorProfile._id.toString();
     
     if (!isOwner && !isVendor) {
       res.status(403);
