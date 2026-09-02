@@ -72,7 +72,7 @@ exports.getUser = asyncHandler(async (req, res) => {
 // @route   PUT /api/v1/users/:id
 // @access  Private
 exports.updateUser = asyncHandler(async (req, res) => {
-  const { firstName, lastName, phone, bio, profilePicture } = req.body;
+  const { firstName, lastName, phone, bio, profilePicture } = req.body || {};
 
   let user = await User.findById(req.params.id);
 
@@ -82,7 +82,7 @@ exports.updateUser = asyncHandler(async (req, res) => {
   }
 
   // Check if user is updating their own profile
-  if (req.user.id !== req.params.id && req.user.role !== 'ADMIN') {
+  if (!isResourceOwner(req.user.id || req.user._id, req.params.id) && req.user.role !== 'ADMIN') {
     res.status(403);
     throw new Error('Not authorized to update this user');
   }
@@ -125,11 +125,28 @@ exports.updateUser = asyncHandler(async (req, res) => {
     updateData.profilePicture = profilePicture; // Should come from file upload endpoint
   }
 
-  user = await User.findByIdAndUpdate(
-    req.params.id,
-    updateData,
-    { new: true, runValidators: true }
-  ).select('-password -refreshToken');
+  if (!Object.keys(updateData).length) {
+    res.status(400);
+    throw new Error('At least one profile field is required');
+  }
+
+  try {
+    user = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password -refreshToken');
+  } catch (error) {
+    if (error?.code === 11000) {
+      res.status(400);
+      throw new Error('That phone number is already in use');
+    }
+    if (error?.name === 'ValidationError') {
+      res.status(400);
+      throw new Error('Please check the profile details and try again');
+    }
+    throw error;
+  }
 
   res.status(200).json({
     success: true,
