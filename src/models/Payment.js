@@ -23,6 +23,11 @@ const paymentSchema = new mongoose.Schema(
     refundAmount: { type: Number, default: 0 },
     refundReason: { type: String },
     refundDate: { type: Date },
+
+    // Flutterwave checkout/audit trail
+    initializedAt: { type: Date },
+    webhookReceivedAt: { type: Date },
+    webhookReference: { type: String },
   },
   { timestamps: true }
 );

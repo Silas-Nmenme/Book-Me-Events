@@ -12,6 +12,7 @@ const {
   refundPayment,
   getPaymentStats,
   createFlutterwavePayment,
+  verifyFlutterwavePayment,
 } = require('../controllers/paymentController');
 
 const { getPaymentsSummary } = require('../controllers/paymentsSummaryController');
@@ -23,6 +24,9 @@ router.get('/ref/:ref', protect, getPaymentByRef);
 router.get('/stats/overview', protect, authorize('ADMIN'), getPaymentStats);
 
 router.get('/summary', protect, getPaymentsSummary);
+
+// Fallback confirmation for delayed/missing webhooks (called on checkout return)
+router.get('/verify/:reference', protect, verifyFlutterwavePayment);
 
 router.get('/:id', protect, getPayment);
 
