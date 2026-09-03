@@ -323,7 +323,7 @@ exports.toggleUserStatus = asyncHandler(async (req, res) => {
 exports.getAllBookings = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
 
-  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
+  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 100);
 
   let filter = {};
   if (status) {
@@ -358,7 +358,7 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
 exports.getAllPayments = asyncHandler(async (req, res) => {
   const { status, page = 1, limit = 10 } = req.query;
 
-  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 50);
+  const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 100);
 
   let filter = {};
   if (status) {
