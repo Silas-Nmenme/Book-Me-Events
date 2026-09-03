@@ -76,14 +76,16 @@ exports.getBooking = asyncHandler(async (req, res) => {
   }
 
   // Check authorization
-  if (req.user.role === 'USER' && !isResourceOwner(req.user.id, booking.user)) {
+  // NOTE: booking.user/booking.vendor are populated documents above, so compare
+  // against their ._id — comparing the whole object always fails (IDOR false-positive).
+  if (req.user.role === 'USER' && !isResourceOwner(req.user.id, booking.user?._id)) {
     res.status(403);
     throw new Error('You cannot access this booking');
   }
 
   if (req.user.role === 'VENDOR') {
     const vendor = await Vendor.findOne({ user: req.user.id });
-    if (!vendor || !vendor._id.equals(booking.vendor)) {
+    if (!vendor || !vendor._id.equals(booking.vendor?._id)) {
       res.status(403);
       throw new Error('You cannot access this booking');
     }
