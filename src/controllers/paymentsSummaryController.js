@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 
 const Payment = require('../models/Payment');
 
@@ -10,7 +11,9 @@ exports.getPaymentsSummary = asyncHandler(async (req, res) => {
   const payments = await Payment.aggregate([
     {
       $match: {
-        user: userId,
+        // Aggregation pipelines bypass Mongoose's string->ObjectId casting,
+        // so this must be a real ObjectId or it will never match any docs.
+        user: new mongoose.Types.ObjectId(userId),
         paymentStatus: 'COMPLETED',
       },
     },

@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 const Request = require('../models/Request');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
@@ -9,6 +10,9 @@ const SupportTicket = require('../models/SupportTicket');
 // Keeps MVP minimal: no persistence, just computed views.
 exports.getUserDashboard = asyncHandler(async (req, res) => {
   const userId = req.user.id;
+  // Aggregation pipelines bypass Mongoose's automatic string->ObjectId casting,
+  // so `$match` must be given a real ObjectId or it will never match any docs.
+  const userObjectId = new mongoose.Types.ObjectId(userId);
 
   const [
     requestsTotal,
@@ -26,11 +30,11 @@ exports.getUserDashboard = asyncHandler(async (req, res) => {
     Booking.countDocuments({ user: userId, bookingStatus: 'COMPLETED' }),
     SupportTicket.countDocuments({ user: userId }),
     Review.aggregate([
-      { $match: { user: userId } },
+      { $match: { user: userObjectId } },
       { $group: { _id: null, avg: { $avg: '$rating' } } },
     ]),
     Payment.aggregate([
-      { $match: { user: userId, paymentStatus: 'COMPLETED' } },
+      { $match: { user: userObjectId, paymentStatus: 'COMPLETED' } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]),
   ]);
