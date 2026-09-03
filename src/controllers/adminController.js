@@ -12,10 +12,73 @@ const {
 } = require('../utils/emailTemplates');
 const { validatePagination } = require('../utils/inputValidator');
 const { toCsv, sendCsv } = require('../utils/csvExport');
+const { buildIssuer, generateAdminTotpSecret, verifyTotp } = require('../utils/totpUtil');
 
 function escapeRegex(str) {
   return str.toString().trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+// @desc    Generate a TOTP provisioning URI for the authenticated admin
+// @route   GET /api/v1/admin/2fa/setup
+// @access  Private/Admin
+exports.setupAdminTwoFactor = asyncHandler(async (req, res) => {
+  if (req.user.totpEnabled) {
+    return res.status(409).json({
+      success: false,
+      message: 'Two-factor authentication is already enabled',
+    });
+  }
+
+  const issuer = buildIssuer();
+  const accountName = req.user.email;
+  const { base32, otpauth_url: otpauthUrl } = generateAdminTotpSecret({ issuer, accountName });
+
+  req.user.totpSecret = base32;
+  req.user.totpVerifiedAt = undefined;
+  await req.user.save();
+
+  return res.status(200).json({
+    success: true,
+    data: { otpauth_url: otpauthUrl },
+  });
+});
+
+// @desc    Verify a TOTP code and enable two-factor authentication for the admin
+// @route   POST /api/v1/admin/2fa/verify
+// @access  Private/Admin
+exports.verifyAdminTwoFactor = asyncHandler(async (req, res) => {
+  const totpCode = (req.body?.totpCode || '').toString().trim();
+
+  if (!/^\d{6}$/.test(totpCode)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Enter a valid 6-digit authenticator code',
+    });
+  }
+
+  if (!req.user.totpSecret) {
+    return res.status(400).json({
+      success: false,
+      message: 'Start two-factor setup before verifying a code',
+    });
+  }
+
+  if (!verifyTotp({ secret: req.user.totpSecret, token: totpCode })) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid authenticator code',
+    });
+  }
+
+  req.user.totpEnabled = true;
+  req.user.totpVerifiedAt = new Date();
+  await req.user.save();
+
+  return res.status(200).json({
+    success: true,
+    message: 'Two-factor authentication enabled',
+  });
+});
 
 
 

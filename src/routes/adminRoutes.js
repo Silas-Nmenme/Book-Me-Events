@@ -20,6 +20,8 @@ const {
   bulkToggleUserStatus,
   bulkVendorAction,
   globalSearch,
+  setupAdminTwoFactor,
+  verifyAdminTwoFactor,
 } = require('../controllers/adminController');
 
 
@@ -28,6 +30,10 @@ router.use(protect, authorize('ADMIN'));
 
 // Dashboard
 router.get('/dashboard', getDashboard);
+
+// Two-factor authentication
+router.get('/2fa/setup', setupAdminTwoFactor);
+router.post('/2fa/verify', verifyAdminTwoFactor);
 
 // Global search
 router.get('/search', globalSearch);
