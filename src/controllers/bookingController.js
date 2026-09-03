@@ -34,7 +34,17 @@ exports.getBookings = asyncHandler(async (req, res) => {
     filter.user = req.user.id;
   } else if (req.user.role === 'VENDOR') {
     const vendor = await Vendor.findOne({ user: req.user.id });
-    if (vendor) filter.vendor = vendor._id;
+    if (!vendor) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        total: 0,
+        pages: 0,
+        currentPage: p,
+        data: [],
+      });
+    }
+    filter.vendor = vendor._id;
   }
   // ADMIN can see all bookings
 

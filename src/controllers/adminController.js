@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const Vendor = require('../models/Vendor');
+const Service = require('../models/Service');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const Review = require('../models/Review');
@@ -384,7 +385,7 @@ exports.toggleUserStatus = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/admin/bookings
 // @access  Private/Admin
 exports.getAllBookings = asyncHandler(async (req, res) => {
-  const { status, page = 1, limit = 10 } = req.query;
+  const { status, search, from, to, sort = 'createdAt:desc', page = 1, limit = 10 } = req.query;
 
   const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 100);
 
@@ -392,6 +393,29 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
   if (status) {
     filter.bookingStatus = status;
   }
+
+  if (from || to) {
+    filter.createdAt = {};
+    if (from && !Number.isNaN(new Date(from).getTime())) filter.createdAt.$gte = new Date(`${from}T00:00:00.000Z`);
+    if (to && !Number.isNaN(new Date(to).getTime())) filter.createdAt.$lte = new Date(`${to}T23:59:59.999Z`);
+  }
+
+  if (search?.trim()) {
+    const pattern = new RegExp(escapeRegex(search), 'i');
+    const [users, vendors, services] = await Promise.all([
+      User.find({ $or: [{ firstName: pattern }, { lastName: pattern }, { email: pattern }] }).select('_id'),
+      Vendor.find({ businessName: pattern }).select('_id'),
+      Service.find({ $or: [{ serviceName: pattern }, { name: pattern }] }).select('_id'),
+    ]);
+    filter.$or = [
+      { user: { $in: users.map((user) => user._id) } },
+      { vendor: { $in: vendors.map((vendor) => vendor._id) } },
+      { service: { $in: services.map((service) => service._id) } },
+    ];
+  }
+
+  const sortDirection = sort === 'createdAt:asc' || sort === 'eventDate:asc' ? 1 : -1;
+  const sortField = sort.startsWith('eventDate:') ? 'eventDate' : 'createdAt';
 
   const skip = (pageNum - 1) * limitNum;
 
@@ -401,7 +425,7 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
     .populate('service')
     .skip(skip)
     .limit(limitNum)
-    .sort({ createdAt: -1 });
+    .sort({ [sortField]: sortDirection });
 
   const total = await Booking.countDocuments(filter);
 
@@ -419,7 +443,7 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/admin/payments
 // @access  Private/Admin
 exports.getAllPayments = asyncHandler(async (req, res) => {
-  const { status, page = 1, limit = 10 } = req.query;
+  const { status, search, from, to, sort = 'createdAt:desc', page = 1, limit = 10 } = req.query;
 
   const { page: pageNum, limit: limitNum } = validatePagination(page, limit, 100);
 
@@ -428,15 +452,40 @@ exports.getAllPayments = asyncHandler(async (req, res) => {
     filter.paymentStatus = status;
   }
 
+  if (from || to) {
+    filter.createdAt = {};
+    if (from && !Number.isNaN(new Date(from).getTime())) filter.createdAt.$gte = new Date(`${from}T00:00:00.000Z`);
+    if (to && !Number.isNaN(new Date(to).getTime())) filter.createdAt.$lte = new Date(`${to}T23:59:59.999Z`);
+  }
+
+  if (search?.trim()) {
+    const pattern = new RegExp(escapeRegex(search), 'i');
+    const [users, vendors, services] = await Promise.all([
+      User.find({ $or: [{ firstName: pattern }, { lastName: pattern }, { email: pattern }] }).select('_id'),
+      Vendor.find({ businessName: pattern }).select('_id'),
+      Service.find({ $or: [{ serviceName: pattern }, { name: pattern }] }).select('_id'),
+    ]);
+    const serviceBookingIds = await Booking.find({ service: { $in: services.map((service) => service._id) } }).distinct('_id');
+    filter.$or = [
+      { transactionReference: pattern },
+      { user: { $in: users.map((user) => user._id) } },
+      { vendor: { $in: vendors.map((vendor) => vendor._id) } },
+      { booking: { $in: serviceBookingIds } },
+    ];
+  }
+
+  const sortDirection = sort === 'createdAt:asc' || sort === 'amount:asc' ? 1 : -1;
+  const sortField = sort.startsWith('amount:') ? 'amount' : 'createdAt';
+
   const skip = (pageNum - 1) * limitNum;
 
   const payments = await Payment.find(filter)
     .populate('user', 'firstName lastName email')
     .populate('vendor', 'businessName')
-    .populate('booking')
+    .populate({ path: 'booking', populate: { path: 'service', select: 'serviceName name' } })
     .skip(skip)
     .limit(limitNum)
-    .sort({ createdAt: -1 });
+    .sort({ [sortField]: sortDirection });
 
   const total = await Payment.countDocuments(filter);
 

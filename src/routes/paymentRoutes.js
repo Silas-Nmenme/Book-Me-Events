@@ -7,6 +7,7 @@ const { paymentCreationLimiter } = require('../middlewares/rateLimiters');
 const {
   getPayments,
   getPayment,
+  getPaymentReceipt,
   createPayment,
   getPaymentByRef,
   refundPayment,
@@ -28,6 +29,7 @@ router.get('/summary', protect, getPaymentsSummary);
 // Fallback confirmation for delayed/missing webhooks (called on checkout return)
 router.get('/verify/:reference', protect, verifyFlutterwavePayment);
 
+router.get('/:id/receipt', protect, getPaymentReceipt);
 router.get('/:id', protect, getPayment);
 
 

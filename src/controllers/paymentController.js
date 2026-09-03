@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
+const Vendor = require('../models/Vendor');
 const { sendEmail } = require('../utils/emailClient');
 const {
   paymentReceiptEmail,
@@ -8,6 +9,32 @@ const {
 } = require('../utils/emailTemplates');
 const { validatePositiveNumber, validateMongoId } = require('../utils/inputValidator');
 const { isResourceOwner } = require('../utils/authorizationHelper');
+
+async function getCurrentVendorId(userId) {
+  const vendor = await Vendor.findOne({ user: userId }).select('_id');
+  return vendor?._id?.toString() || null;
+}
+
+function relationshipId(value) {
+  return value?._id?.toString() || value?.toString() || null;
+}
+
+async function canAccessPayment(payment, user) {
+  if (user.role === 'ADMIN') return true;
+  if (user.role === 'USER') return relationshipId(payment.user) === user.id;
+  if (user.role === 'VENDOR') {
+    const vendorId = await getCurrentVendorId(user.id);
+    return !!vendorId && relationshipId(payment.vendor) === vendorId;
+  }
+  return false;
+}
+
+function populatePaymentDetails(query) {
+  return query
+    .populate('user', 'firstName lastName email phone')
+    .populate({ path: 'vendor', select: 'businessName user', populate: { path: 'user', select: 'firstName lastName email phone' } })
+    .populate({ path: 'booking', populate: { path: 'service', select: 'serviceName name' } });
+}
 
 const verifyFlutterwaveSignature = (rawBody, headerName, signature, secret) => {
   if (!signature || !secret || !rawBody || !headerName) {
@@ -300,16 +327,17 @@ exports.getPayments = async (req, res) => {
     if (req.user.role === 'USER') {
       filter.user = req.user.id;
     } else if (req.user.role === 'VENDOR') {
-      filter.vendor = req.user._id;
+      const vendorId = await getCurrentVendorId(req.user.id);
+      if (!vendorId) {
+        return res.status(200).json({ success: true, count: 0, total: 0, pages: 0, currentPage: pageNum, data: [] });
+      }
+      filter.vendor = vendorId;
     }
     // ADMIN has no filter restriction
 
     const skip = (pageNum - 1) * limitNum;
 
-    const payments = await Payment.find(filter)
-      .populate('booking')
-      .populate('user', 'firstName lastName email')
-      .populate('vendor', 'businessName')
+    const payments = await populatePaymentDetails(Payment.find(filter))
       .skip(skip)
       .limit(limitNum)
       .sort({ createdAt: -1 });
@@ -338,10 +366,7 @@ exports.getPayments = async (req, res) => {
  */
 exports.getPayment = async (req, res) => {
   try {
-    const payment = await Payment.findById(req.params.id)
-      .populate('booking')
-      .populate('user')
-      .populate('vendor');
+    const payment = await populatePaymentDetails(Payment.findById(req.params.id));
 
     if (!payment) {
       return res.status(404).json({
@@ -353,16 +378,11 @@ exports.getPayment = async (req, res) => {
     // Enforce access control: USER can only read their own payments;
     // VENDOR can only read payments tied to their vendor profile;
     // ADMIN can read all.
-    if (req.user.role !== 'ADMIN') {
-      const isOwner = payment.user && payment.user._id && payment.user._id.toString() === req.user.id;
-      const isVendorOwner = payment.vendor && payment.vendor._id && payment.vendor._id.toString() === req.user.id;
-
-      if (!isOwner && !isVendorOwner) {
-        return res.status(403).json({
-          success: false,
-          message: 'Not authorized to view this payment'
-        });
-      }
+    if (!(await canAccessPayment(payment, req.user))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view this payment'
+      });
     }
 
     return res.status(200).json({
@@ -375,6 +395,26 @@ exports.getPayment = async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+};
+
+/**
+ * GET PAYMENT RECEIPT
+ */
+exports.getPaymentReceipt = async (req, res) => {
+  try {
+    const payment = await populatePaymentDetails(Payment.findById(req.params.id));
+
+    if (!payment) {
+      return res.status(404).json({ success: false, message: 'Payment not found' });
+    }
+    if (!(await canAccessPayment(payment, req.user))) {
+      return res.status(403).json({ success: false, message: 'Not authorized to view this receipt' });
+    }
+
+    return res.status(200).json({ success: true, data: payment });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -501,18 +541,17 @@ exports.createPayment = async (req, res) => {
  */
 exports.getPaymentByRef = async (req, res) => {
   try {
-    const payment = await Payment.findOne({
-      transactionReference: req.params.ref
-    })
-      .populate('booking')
-      .populate('user')
-      .populate('vendor');
+    const payment = await populatePaymentDetails(Payment.findOne({ transactionReference: req.params.ref }));
 
     if (!payment) {
       return res.status(404).json({
         success: false,
         message: 'Payment not found'
       });
+    }
+
+    if (!(await canAccessPayment(payment, req.user))) {
+      return res.status(403).json({ success: false, message: 'Not authorized to view this payment' });
     }
 
     return res.status(200).json({
@@ -544,11 +583,7 @@ exports.refundPayment = async (req, res) => {
       });
     }
 
-    if (
-      payment.user.toString() !== req.user.id &&
-      payment.vendor.toString() !== req.user._id &&
-      req.user.role !== 'ADMIN'
-    ) {
+    if (!(await canAccessPayment(payment, req.user))) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to refund this payment'

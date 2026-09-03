@@ -2,19 +2,28 @@ const asyncHandler = require('express-async-handler');
 const mongoose = require('mongoose');
 
 const Payment = require('../models/Payment');
+const Vendor = require('../models/Vendor');
 
 exports.getPaymentsSummary = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
   const now = new Date();
   const year = now.getFullYear();
+  const match = { paymentStatus: 'COMPLETED' };
+
+  if (req.user.role === 'USER') {
+    match.user = new mongoose.Types.ObjectId(req.user.id);
+  } else if (req.user.role === 'VENDOR') {
+    const vendor = await Vendor.findOne({ user: req.user.id }).select('_id');
+    if (!vendor) {
+      return res.status(200).json({ success: true, data: [], total: 0, message: 'Payments summary fetched' });
+    }
+    match.vendor = vendor._id;
+  }
 
   const payments = await Payment.aggregate([
     {
       $match: {
-        // Aggregation pipelines bypass Mongoose's string->ObjectId casting,
-        // so this must be a real ObjectId or it will never match any docs.
-        user: new mongoose.Types.ObjectId(userId),
-        paymentStatus: 'COMPLETED',
+        ...match,
+        $expr: { $eq: [{ $year: '$createdAt' }, year] },
       },
     },
     {
@@ -23,7 +32,6 @@ exports.getPaymentsSummary = asyncHandler(async (req, res) => {
         monthNum: { $month: '$createdAt' },
       },
     },
-    { $match: { $expr: { $eq: [{ $year: '$createdAt' }, year] } } },
     {
       $group: {
         _id: { month: '$month', monthNum: '$monthNum' },
@@ -39,7 +47,8 @@ exports.getPaymentsSummary = asyncHandler(async (req, res) => {
   payments.forEach((p) => map.set(p._id.month, p.amount));
 
   const items = monthOrder.map((m) => ({ month: m, amount: map.get(m) || 0 }));
+  const total = payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
 
-  return res.status(200).json({ success: true, data: items, message: 'Payments summary fetched' });
+  return res.status(200).json({ success: true, data: items, total, message: 'Payments summary fetched' });
 });
 
