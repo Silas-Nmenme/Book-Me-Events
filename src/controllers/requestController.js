@@ -7,6 +7,7 @@ const { sendEmail } = require('../utils/emailClient');
 const { validatePagination, validatePositiveNumber } = require('../utils/inputValidator');
 const { isResourceOwner } = require('../utils/authorizationHelper');
 const { newServiceRequestVendorEmail } = require('../utils/emailTemplates');
+const { createNotification } = require('../utils/notificationService');
 
 // @desc    Get all requests
 // @route   GET /api/v1/requests
@@ -221,6 +222,16 @@ const request = await Request.create({
         html: emailTemplate.html,
       });
     }
+    await createNotification({
+      recipientId: vendorDoc?.user?._id,
+      type: 'SERVICE_REQUEST',
+      title: 'New service request',
+      message: `You received a new request for ${serviceExists?.serviceName || 'your service'}.`,
+      link: `vendor-service.html?requestId=${request._id}`,
+      entityType: 'Request',
+      entityId: request._id,
+      io: req.app?.get?.('io'),
+    });
   } catch (emailError) {
     console.error('Vendor service request notification email failed:', emailError?.message || emailError);
   }
@@ -267,6 +278,18 @@ exports.acceptRequest = asyncHandler(async (req, res) => {
     severity: 'SUCCESS',
   });
 
+  await createNotification({
+    recipientId: request.user,
+    type: 'REQUEST_ACCEPTED',
+    title: 'Request accepted',
+    message: 'A vendor accepted your service request.',
+    link: `user-request.html?requestId=${request._id}`,
+    entityType: 'Request',
+    entityId: request._id,
+    io: req.app?.get?.('io'),
+    email: true,
+  });
+
   res.status(200).json({
     success: true,
     message: 'Request accepted successfully',
@@ -306,6 +329,18 @@ exports.declineRequest = asyncHandler(async (req, res) => {
     entityType: 'REQUEST',
     entityId: request._id,
     severity: 'WARN',
+  });
+
+  await createNotification({
+    recipientId: request.user,
+    type: 'REQUEST_REJECTED',
+    title: 'Request declined',
+    message: 'A vendor declined your service request.',
+    link: `user-request.html?requestId=${request._id}`,
+    entityType: 'Request',
+    entityId: request._id,
+    io: req.app?.get?.('io'),
+    email: true,
   });
 
   res.status(200).json({

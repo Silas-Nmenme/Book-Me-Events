@@ -75,6 +75,7 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
       ]),
       Message.countDocuments({ recipient: vendorUserObjectId, isRead: false }),
       SupportTicket.countDocuments({
+        status: { $in: ['OPEN', 'IN_PROGRESS'] },
         $or: [
           { request: { $in: await Request.find({ vendor: vendorObjectId }).distinct('_id') } },
           { booking: { $in: await Booking.find({ vendor: vendorObjectId }).distinct('_id') } },

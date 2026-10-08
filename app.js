@@ -139,6 +139,7 @@ safeRoute('/api/v1/admin', require('./src/routes/adminRoutes'));
 safeRoute('/api/v1/dashboard', require('./src/routes/dashboardRoutes'));
 
 safeRoute('/api/v1/announcements', require('./src/routes/announcementRoutes'));
+safeRoute('/api/v1/notifications', require('./src/routes/notificationRoutes'));
 
 
 safeRoute('/api/v1/uploads', require('./src/routes/uploadRoutes'));
@@ -149,6 +150,7 @@ safeRoute('/api/v1/users', require('./src/routes/userActivityRoutes'));
 
 // VENDOR MVP: analytics/sla/tickets/promotions
 safeRoute('/api/v1/tickets', require('./src/routes/ticketRoutes'));
+safeRoute('/api/v1/reports', require('./src/routes/userReportRoutes'));
 
 // ADMIN MVP: fraud signals
 safeRoute('/api/v1/fraud', require('./src/routes/fraudSignalsRoutes'));

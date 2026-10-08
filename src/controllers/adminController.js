@@ -14,6 +14,7 @@ const {
 const { validatePagination } = require('../utils/inputValidator');
 const { toCsv, sendCsv } = require('../utils/csvExport');
 const { buildIssuer, generateAdminTotpSecret, verifyTotp } = require('../utils/totpUtil');
+const { createNotification } = require('../utils/notificationService');
 
 function escapeRegex(str) {
   return str.toString().trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -374,11 +375,48 @@ exports.toggleUserStatus = asyncHandler(async (req, res) => {
   user.isActive = !user.isActive;
   await user.save();
 
+  if (!user.isActive) {
+    await createNotification({
+      recipientId: user._id,
+      type: 'ACCOUNT_SUSPENSION',
+      title: 'Account suspended',
+      message: 'Your account has been suspended. Contact support if you believe this is an error.',
+      link: 'user-tickets.html',
+      entityType: 'User',
+      entityId: user._id,
+      io: req.app?.get?.('io'),
+      email: true,
+    });
+  }
+
   res.status(200).json({
     success: true,
     message: `User ${user.isActive ? 'enabled' : 'disabled'} successfully`,
     data: user,
   });
+});
+
+exports.sendAccountWarning = asyncHandler(async (req, res) => {
+  const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+  if (message.length < 5 || message.length > 1000) {
+    return res.status(400).json({ success: false, message: 'Warning message must be 5-1000 characters' });
+  }
+
+  const user = await User.findById(req.params.id).select('_id');
+  if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+  await createNotification({
+    recipientId: user._id,
+    type: 'ACCOUNT_WARNING',
+    title: 'Account warning',
+    message,
+    link: 'settings.html',
+    entityType: 'User',
+    entityId: user._id,
+    io: req.app?.get?.('io'),
+    email: true,
+  });
+  res.status(200).json({ success: true, message: 'Account warning sent' });
 });
 
 // @desc    Get all bookings (Admin)
@@ -776,6 +814,20 @@ exports.bulkToggleUserStatus = asyncHandler(async (req, res) => {
   const safeIds = userIds.slice(0, MAX_BULK_IDS).filter((id) => /^[a-f0-9]{24}$/i.test(id));
 
   const result = await User.updateMany({ _id: { $in: safeIds } }, { $set: { isActive } });
+
+  if (!isActive) {
+    const affectedUsers = await User.find({ _id: { $in: safeIds } }).select('_id');
+    await Promise.all(affectedUsers.map((user) => createNotification({
+      recipientId: user._id,
+      type: 'ACCOUNT_SUSPENSION',
+      title: 'Account suspended',
+      message: 'Your account has been suspended. Contact support if you believe this is an error.',
+      link: 'user-tickets.html',
+      entityType: 'User',
+      entityId: user._id,
+      io: req.app?.get?.('io'),
+    })));
+  }
 
   res.status(200).json({
     success: true,

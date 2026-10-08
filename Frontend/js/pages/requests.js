@@ -260,6 +260,26 @@ function buildCard(req, { myRole } = {}) {
               Decline
             </button>
           ` : ''}
+          ${myRoleNorm === 'VENDOR' ? `
+            <button
+              class="btn btn-outline-danger btn-sm"
+              data-action="reportUser"
+              type="button"
+              data-id="${escapeHtml(id || '')}"
+            >
+              Report user
+            </button>
+          ` : ''}
+          ${myRoleNorm === 'USER' ? `
+            <button
+              class="btn btn-outline-danger btn-sm"
+              data-action="reportVendor"
+              type="button"
+              data-id="${escapeHtml(id || '')}"
+            >
+              Report vendor
+            </button>
+          ` : ''}
           ${myRoleNorm === 'USER' ? `
             <button
               class="btn btn-danger btn-sm"
@@ -520,6 +540,11 @@ export async function initRequestsPage({ me, role } = {}) {
   if (!Array.isArray(items) || items.length === 0) {
 
         noRequests?.classList.remove('d-none');
+        if (noRequests) {
+          noRequests.textContent = myRole === 'VENDOR'
+            ? "You haven't received any service requests yet."
+            : "You haven't submitted any service requests yet.";
+        }
 
         requestList.innerHTML = '';
         return;
@@ -560,6 +585,21 @@ export async function initRequestsPage({ me, role } = {}) {
               window.location.href =
                 `bookings.html?requestId=${encodeURIComponent(id)}`;
 
+              return;
+            }
+
+            if (action === 'reportUser' || action === 'reportVendor') {
+              const reason = window.prompt('Briefly describe the issue (at least 10 characters):');
+              if (!reason) return;
+              try {
+                await apiFetch('/api/v1/reports', {
+                  method: 'POST',
+                  body: { requestId: id, reason, target: action === 'reportVendor' ? 'VENDOR' : 'USER' },
+                });
+                toast({ title: 'Report submitted', message: 'Support will review your report.', variant: 'success' });
+              } catch (e) {
+                toast({ title: 'Report failed', message: e?.message || 'Try again.', variant: 'danger' });
+              }
               return;
             }
 

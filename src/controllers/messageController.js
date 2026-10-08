@@ -1,4 +1,5 @@
 const asyncHandler = require('express-async-handler');
+const { createNotification } = require('../utils/notificationService');
 const Message = require('../models/Message');
 const { validatePagination, sanitizeString } = require('../utils/inputValidator');
 
@@ -324,6 +325,17 @@ exports.sendMessage = asyncHandler(async (req, res) => {
     io.to(`user:${req.user.id}`).emit('message:new', payload);
     io.to(`user:${recipient}`).emit('message:new', payload);
   }
+
+  await createNotification({
+    recipientId: recipient,
+    type: 'NEW_MESSAGE',
+    title: 'New message',
+    message: 'You received a new message.',
+    link: `messages.html?conversationId=${encodeURIComponent(message.conversationId || '')}`,
+    entityType: 'Message',
+    entityId: message._id,
+    io,
+  });
 
   const populatedMessage = await message.populate([
     { path: 'sender', select: 'firstName lastName profilePicture' },

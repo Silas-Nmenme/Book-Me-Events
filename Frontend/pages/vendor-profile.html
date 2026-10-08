@@ -36,6 +36,7 @@
               <h1 class="h2 fw-bold mb-1" id="vendorName"></h1>
               <div class="text-muted-soft" id="vendorLocation"></div>
               <div class="d-flex flex-wrap gap-2 mt-3" id="vendorContacts"></div>
+              <div class="mt-3"><button id="saveVendorButton" class="btn btn-soft btn-sm d-none" type="button">Save vendor</button></div>
             </div>
           </div>
         </section>
@@ -76,7 +77,7 @@
     </main>
 
     <script type="module">
-      import { getVendor, getVendorReviews, getVendorServices } from '../js/api.js';
+      import { apiFetch, fetchMe, getVendor, getVendorReviews, getVendorServices, getToken } from '../js/api.js';
       import { initThemeToggle } from '../js/theme-toggle.js';
 
       initThemeToggle();
@@ -107,6 +108,31 @@
           ? (serviceResult.value?.data?.data || serviceResult.value?.data || [])
           : [];
         const user = vendor.user || {};
+        const saveButton = document.getElementById('saveVendorButton');
+        const signedInUser = getToken() ? await fetchMe().catch(() => null) : null;
+        const currentUser = signedInUser?.data || signedInUser;
+        if (currentUser?.role === 'USER' && saveButton) {
+          const favoriteResponse = await apiFetch('/api/v1/users/me/favorites').catch(() => null);
+          const favoriteVendors = Array.isArray(favoriteResponse?.data) ? favoriteResponse.data : [];
+          let isSaved = favoriteVendors.some((item) => String(item?._id || item?.id) === String(vendor._id || id));
+          saveButton.textContent = isSaved ? 'Remove from saved' : 'Save vendor';
+          saveButton.classList.remove('d-none');
+          saveButton.addEventListener('click', async () => {
+            saveButton.disabled = true;
+            try {
+              const vendorId = vendor._id || id;
+              await apiFetch(`/api/v1/users/me/favorites/${encodeURIComponent(vendorId)}`, {
+                method: isSaved ? 'DELETE' : 'POST',
+              });
+              isSaved = !isSaved;
+              saveButton.textContent = isSaved ? 'Remove from saved' : 'Save vendor';
+            } catch (error) {
+              window.alert(error?.message || 'Could not update saved vendors.');
+            } finally {
+              saveButton.disabled = false;
+            }
+          });
+        }
 
         document.title = `${vendor.businessName || 'Vendor'} - Book Me Events`;
         document.getElementById('vendorName').textContent = vendor.businessName || 'Vendor';

@@ -22,7 +22,10 @@ const {
   globalSearch,
   setupAdminTwoFactor,
   verifyAdminTwoFactor,
+  sendAccountWarning,
 } = require('../controllers/adminController');
+const { getUserReports, updateUserReport } = require('../controllers/userReportController');
+const { getAllTickets, updateTicket } = require('../controllers/ticketController');
 
 
 // All admin routes require authentication and ADMIN role
@@ -53,6 +56,15 @@ router.put('/vendors/:id/reject', rejectVendor);
 
 // User status management
 router.put('/users/:id/toggle-status', toggleUserStatus);
+router.post('/users/:id/warning', sendAccountWarning);
+
+// User reports
+router.get('/reports', getUserReports);
+router.put('/reports/:id', updateUserReport);
+
+// Support ticket management
+router.get('/tickets', getAllTickets);
+router.put('/tickets/:id', updateTicket);
 
 // Bookings
 router.get('/bookings', getAllBookings);

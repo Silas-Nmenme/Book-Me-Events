@@ -9,6 +9,7 @@ const {
 } = require('../utils/emailTemplates');
 const { validatePositiveNumber, validateMongoId } = require('../utils/inputValidator');
 const { isResourceOwner } = require('../utils/authorizationHelper');
+const { createNotification } = require('../utils/notificationService');
 
 async function getCurrentVendorId(userId) {
   const vendor = await Vendor.findOne({ user: userId }).select('_id');
@@ -181,7 +182,7 @@ const verifyFlutterwaveTransactionByReference = async (txRef) => {
  * Shared by both the webhook handler and the verify-on-return fallback endpoint
  * so the two paths can never disagree on validation/update logic.
  */
-const applyConfirmedFlutterwaveCharge = async (payment, data) => {
+const applyConfirmedFlutterwaveCharge = async (payment, data, io) => {
   if (payment.paymentStatus === 'COMPLETED') {
     return { status: 'duplicate', payment };
   }
@@ -202,6 +203,17 @@ const applyConfirmedFlutterwaveCharge = async (payment, data) => {
   if (amountReceived <= 0) {
     payment.paymentStatus = 'FAILED';
     await payment.save();
+    await createNotification({
+      recipientId: payment.user,
+      type: 'PAYMENT_STATUS_CHANGED',
+      title: 'Payment not completed',
+      message: 'Your payment could not be confirmed. Review the payment details and try again.',
+      link: 'payments.html',
+      entityType: 'Payment',
+      entityId: payment._id,
+      io,
+      email: true,
+    });
     return { status: 'invalid_amount', amountReceived };
   }
 
@@ -210,12 +222,34 @@ const applyConfirmedFlutterwaveCharge = async (payment, data) => {
   if (flutterwaveCurrency !== expectedCurrency) {
     payment.paymentStatus = 'FAILED';
     await payment.save();
+    await createNotification({
+      recipientId: payment.user,
+      type: 'PAYMENT_STATUS_CHANGED',
+      title: 'Payment not completed',
+      message: 'Your payment could not be confirmed because the currency did not match.',
+      link: 'payments.html',
+      entityType: 'Payment',
+      entityId: payment._id,
+      io,
+      email: true,
+    });
     return { status: 'currency_mismatch', expectedCurrency, flutterwaveCurrency };
   }
 
   if (amountReceived < Number(payment.amount)) {
     payment.paymentStatus = 'FAILED';
     await payment.save();
+    await createNotification({
+      recipientId: payment.user,
+      type: 'PAYMENT_STATUS_CHANGED',
+      title: 'Payment not completed',
+      message: 'The amount received was less than the expected payment amount.',
+      link: 'payments.html',
+      entityType: 'Payment',
+      entityId: payment._id,
+      io,
+      email: true,
+    });
     return { status: 'insufficient_amount', expected: payment.amount, received: amountReceived };
   }
 
@@ -299,6 +333,29 @@ const applyConfirmedFlutterwaveCharge = async (payment, data) => {
   } catch (e) {
     console.error('Vendor notification email failed:', e.message || e);
   }
+
+  await Promise.all([
+    createNotification({
+      recipientId: finalBooking.user?._id || finalBooking.user,
+      type: 'PAYMENT_STATUS_CHANGED',
+      title: 'Payment confirmed',
+      message: `Your payment for booking ${finalBooking._id} is complete.`,
+      link: `payments.html?bookingId=${finalBooking._id}`,
+      entityType: 'Payment',
+      entityId: payment._id,
+      io,
+    }),
+    createNotification({
+      recipientId: finalBooking.vendor?.user?._id || finalBooking.vendor?.user,
+      type: 'PAYMENT_RECEIVED',
+      title: 'Payment received',
+      message: `A payment for booking ${finalBooking._id} has been completed.`,
+      link: `payments.html?bookingId=${finalBooking._id}`,
+      entityType: 'Payment',
+      entityId: payment._id,
+      io,
+    }),
+  ]);
 
   return { status: 'completed', payment: updatedPayment, booking: finalBooking };
 };
@@ -612,6 +669,31 @@ exports.refundPayment = async (req, res) => {
       paymentStatus: 'REFUNDED'
     });
 
+    const vendor = await Vendor.findById(payment.vendor).select('user');
+    await Promise.all([
+      createNotification({
+        recipientId: payment.user,
+        type: 'PAYMENT_STATUS_CHANGED',
+        title: 'Payment refunded',
+        message: `Your payment for booking ${payment.booking} has been refunded.`,
+        link: `payments.html?bookingId=${payment.booking}`,
+        entityType: 'Payment',
+        entityId: payment._id,
+        io: req.app?.get?.('io'),
+        email: true,
+      }),
+      createNotification({
+        recipientId: vendor?.user,
+        type: 'PAYMENT_STATUS_CHANGED',
+        title: 'Payment refunded',
+        message: `The payment for booking ${payment.booking} has been refunded.`,
+        link: `payments.html?bookingId=${payment.booking}`,
+        entityType: 'Payment',
+        entityId: payment._id,
+        io: req.app?.get?.('io'),
+      }),
+    ]);
+
     return res.status(200).json({
       success: true,
       message: 'Payment refunded successfully',
@@ -859,7 +941,7 @@ exports.handleFlutterwaveWebhook = async (req, res) => {
     // The unguessable `transactionReference` lookup above, combined with the verified
     // webhook signature, is sufficient proof this event belongs to this payment.
 
-    const result = await applyConfirmedFlutterwaveCharge(payment, data);
+    const result = await applyConfirmedFlutterwaveCharge(payment, data, req.app?.get?.('io'));
 
     if (result.status === 'duplicate') {
       return res.json({ received: true, duplicated: true });
@@ -925,7 +1007,7 @@ exports.verifyFlutterwavePayment = async (req, res) => {
       });
     }
 
-    const result = await applyConfirmedFlutterwaveCharge(payment, data);
+    const result = await applyConfirmedFlutterwaveCharge(payment, data, req.app?.get?.('io'));
 
     if (result.status === 'completed' || result.status === 'duplicate') {
       const latestPayment = await Payment.findById(payment._id);

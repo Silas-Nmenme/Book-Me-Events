@@ -10,6 +10,15 @@ const {
   getUserBookings,
   getUserRequests,
 } = require('../controllers/userController');
+const {
+  getFavoriteVendors,
+  addFavoriteVendor,
+  removeFavoriteVendor,
+} = require('../controllers/favoriteVendorController');
+
+router.get('/me/favorites', protect, authorize('USER'), getFavoriteVendors);
+router.post('/me/favorites/:vendorId', protect, authorize('USER'), addFavoriteVendor);
+router.delete('/me/favorites/:vendorId', protect, authorize('USER'), removeFavoriteVendor);
 
 // Get current user
 router.get('/:id', protect, apiLimiter, getUser);

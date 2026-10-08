@@ -5,6 +5,7 @@ const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const Review = require('../models/Review');
 const SupportTicket = require('../models/SupportTicket');
+const Message = require('../models/Message');
 
 // User dashboard analytics derived from existing domain models.
 // Keeps MVP minimal: no persistence, just computed views.
@@ -17,18 +18,26 @@ exports.getUserDashboard = asyncHandler(async (req, res) => {
   const [
     requestsTotal,
     requestsPending,
+    requestsAccepted,
     bookingsTotal,
     bookingsCompleted,
     ticketsTotal,
+    openTickets,
+    totalPayments,
+    unreadMessages,
     avgRatingAgg,
     // Optional: keep totalRevenue available for later UI work.
     paymentsTotalRevenueAgg,
   ] = await Promise.all([
     Request.countDocuments({ user: userId }),
     Request.countDocuments({ user: userId, status: 'PENDING' }),
+    Request.countDocuments({ user: userId, status: 'ACCEPTED' }),
     Booking.countDocuments({ user: userId }),
     Booking.countDocuments({ user: userId, bookingStatus: 'COMPLETED' }),
     SupportTicket.countDocuments({ user: userId }),
+    SupportTicket.countDocuments({ user: userId, status: { $in: ['OPEN', 'IN_PROGRESS'] } }),
+    Payment.countDocuments({ user: userId }),
+    Message.countDocuments({ recipient: userId, isRead: false }),
     Review.aggregate([
       { $match: { user: userObjectId } },
       { $group: { _id: null, avg: { $avg: '$rating' } } },
@@ -51,9 +60,13 @@ exports.getUserDashboard = asyncHandler(async (req, res) => {
     data: {
       requestsTotal,
       requestsPending,
+      requestsAccepted,
       bookingsTotal,
       bookingsCompleted,
       ticketsTotal,
+      openTickets,
+      totalPayments,
+      unreadMessages,
       averageRating,
       totalRevenue,
     },

@@ -73,6 +73,9 @@ async function fetchVendorStats({ me, role }) {
     const completedBookings = Number(analytics?.completedBookings ?? 0);
     const pendingBookings = Number(analytics?.pendingBookings ?? Math.max(0, totalBookings - completedBookings));
     const openSupportTickets = Number(analytics?.openSupportTickets ?? analytics?.supportTickets ?? 0);
+    const totalPayments = Number(analytics?.totalPayments ?? 0);
+    const totalRevenue = Number(analytics?.totalRevenue ?? 0);
+    const unreadMessages = Number(analytics?.unreadMessages ?? 0);
 
     setText('vStatRequests', pendingRequests);
     setText('vStatAccepted', acceptedRequests);
@@ -80,15 +83,21 @@ async function fetchVendorStats({ me, role }) {
     setText('vStatPendingBookings', pendingBookings);
     setText('vStatCompletedBookings', completedBookings);
     setText('vStatSupportTickets', openSupportTickets);
+    setText('vStatPayments', totalPayments);
+    setText('vStatRevenue', Number.isFinite(totalRevenue) ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(totalRevenue) : '—');
+    setText('vStatUnreadMessages', unreadMessages);
     setPct('vStatBreachRate', sla?.breachRate ?? 0);
   } catch (e) {
-    setText('vStatRequests', 0);
-    setText('vStatAccepted', 0);
-    setText('vStatServices', 0);
-    setText('vStatPendingBookings', 0);
-    setText('vStatCompletedBookings', 0);
-    setText('vStatSupportTickets', 0);
-    setPct('vStatBreachRate', 0);
+    setText('vStatRequests', '—');
+    setText('vStatAccepted', '—');
+    setText('vStatServices', '—');
+    setText('vStatPendingBookings', '—');
+    setText('vStatCompletedBookings', '—');
+    setText('vStatSupportTickets', '—');
+    setText('vStatPayments', '—');
+    setText('vStatRevenue', '—');
+    setText('vStatUnreadMessages', '—');
+    setPct('vStatBreachRate', null);
   }
 }
 

@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     profilePicture: { type: String },
     bio: { type: String },
+    favoriteVendors: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' }],
     refreshToken: { type: String },
 
     // OTP verification (numeric 6-digit, DB-backed)

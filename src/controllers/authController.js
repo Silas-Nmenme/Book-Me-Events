@@ -424,3 +424,26 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   });
 });
 
+exports.changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword, passwordConfirm } = req.body || {};
+  if (!currentPassword || !newPassword || !passwordConfirm) {
+    return res.status(400).json({ success: false, message: 'Current password and new password confirmation are required' });
+  }
+  if (newPassword !== passwordConfirm) {
+    return res.status(400).json({ success: false, message: 'Passwords do not match' });
+  }
+
+  const strength = validatePasswordStrength(newPassword);
+  if (!strength.valid) return res.status(400).json({ success: false, message: strength.error });
+
+  const user = await User.findById(req.user.id);
+  if (!user || !(await user.matchPassword(currentPassword))) {
+    return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+  }
+
+  user.password = newPassword;
+  user.refreshToken = undefined;
+  await user.save();
+  res.status(200).json({ success: true, message: 'Password updated successfully' });
+});
+
