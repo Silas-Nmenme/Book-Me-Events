@@ -26,6 +26,22 @@ const {
 } = require('../controllers/adminController');
 const { getUserReports, updateUserReport } = require('../controllers/userReportController');
 const { getAllTickets, updateTicket } = require('../controllers/ticketController');
+const { uploadEvidence } = require('../middlewares/uploadMiddleware');
+const { uploadLimiter } = require('../middlewares/rateLimiters');
+const {
+  listAdminCompletionReports,
+  reviewCompletionReport,
+  getAdminCompletionReport,
+} = require('../controllers/completionReportController');
+const {
+  listAdminPayouts,
+  recheckPayoutEligibility,
+  approveVendorPayout,
+  beginManualPayoutTransfer,
+  recordManualPayout,
+  markPayoutFailed,
+  reopenFailedPayout,
+} = require('../controllers/vendorPayoutController');
 
 
 // All admin routes require authentication and ADMIN role
@@ -65,6 +81,20 @@ router.put('/reports/:id', updateUserReport);
 // Support ticket management
 router.get('/tickets', getAllTickets);
 router.put('/tickets/:id', updateTicket);
+
+// Service completion review
+router.get('/service-completions', listAdminCompletionReports);
+router.get('/service-completions/:reportId', getAdminCompletionReport);
+router.put('/service-completions/:reportId/review', reviewCompletionReport);
+
+// Admin-controlled manual payout reconciliation (no transfer provider is configured).
+router.get('/payouts', listAdminPayouts);
+router.post('/payouts/:payoutId/recheck', recheckPayoutEligibility);
+router.post('/payouts/:payoutId/approve', approveVendorPayout);
+router.post('/payouts/:payoutId/begin-manual-transfer', beginManualPayoutTransfer);
+router.post('/payouts/:payoutId/record-manual', uploadLimiter, uploadEvidence('proof'), recordManualPayout);
+router.post('/payouts/:payoutId/failed', markPayoutFailed);
+router.post('/payouts/:payoutId/reopen', reopenFailedPayout);
 
 // Bookings
 router.get('/bookings', getAllBookings);

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect, authorize } = require('../middlewares/authMiddleware');
 const { getVendorAnalytics } = require('../controllers/vendorAnalyticsController');
+const { listVendorPayouts } = require('../controllers/vendorPayoutController');
 const { getVendorSla } = require('../controllers/vendorSlaController');
 const {
   getMyTickets,
@@ -16,6 +17,7 @@ const {
 
 // VENDOR-only analytics & SLA
 router.get('/analytics', protect, authorize('VENDOR'), getVendorAnalytics);
+router.get('/payouts', protect, authorize('VENDOR'), listVendorPayouts);
 router.get('/sla', protect, authorize('VENDOR'), getVendorSla);
 
 // VENDOR ticket triage (MVP: derived via request/booking ownership)

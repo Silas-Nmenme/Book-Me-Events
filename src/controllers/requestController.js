@@ -22,7 +22,7 @@ exports.getRequests = asyncHandler(async (req, res) => {
   let filter = {};
 
   if (status) {
-    const validStatuses = ['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED', 'BOOKED'];
+    const validStatuses = ['PENDING', 'ACCEPTED', 'BOOKED', 'AWAITING_CLIENT_CONFIRMATION', 'AWAITING_ADMIN_REVIEW', 'DISPUTED', 'REJECTED', 'COMPLETED', 'CANCELLED'];
     const statusUpper = status.toString().toUpperCase();
     if (validStatuses.includes(statusUpper)) {
       filter.status = statusUpper;

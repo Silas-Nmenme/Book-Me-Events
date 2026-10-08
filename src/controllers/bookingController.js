@@ -4,6 +4,7 @@ const Request = require('../models/Request');
 const Service = require('../models/Service');
 const Vendor = require('../models/Vendor');
 const Payment = require('../models/Payment');
+const CompletionReport = require('../models/CompletionReport');
 const { sendEmail } = require('../utils/emailClient');
 const { bookingCreatedEmail } = require('../utils/emailTemplates');
 const { validatePositiveNumber, validatePagination } = require('../utils/inputValidator');
@@ -23,7 +24,7 @@ exports.getBookings = asyncHandler(async (req, res) => {
 
   if (status) {
     // Validate status is a valid booking status
-    const validStatuses = ['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'];
+    const validStatuses = ['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'AWAITING_CLIENT_CONFIRMATION', 'AWAITING_ADMIN_REVIEW', 'DISPUTED', 'COMPLETED', 'CANCELLED'];
     if (validStatuses.includes(String(status).toUpperCase())) {
       filter.bookingStatus = status;
     }
@@ -345,23 +346,19 @@ exports.completeBooking = asyncHandler(async (req, res) => {
     throw new Error('Not authorized to complete this booking');
   }
 
-  booking.bookingStatus = 'COMPLETED';
-  await booking.save();
+  const report = await CompletionReport.findOne({ booking: booking._id }).select('_id reportId status');
+  if (report) {
+    return res.status(200).json({
+      success: true,
+      message: 'A completion report already exists for this booking',
+      data: report,
+    });
+  }
 
-  const { logActivity } = require('../utils/activityLog');
-  await logActivity({
-    userId: booking.user.toString(),
-    actorId: req.user.id,
-    actionType: 'BOOKING_COMPLETED',
-    entityType: 'BOOKING',
-    entityId: booking._id,
-    severity: 'SUCCESS',
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'Booking marked as completed',
-    data: booking,
+  return res.status(409).json({
+    success: false,
+    message: 'Submit a service completion report before a booking can be completed',
+    data: { bookingId: booking._id },
   });
 });
 

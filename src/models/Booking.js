@@ -17,7 +17,7 @@ const bookingSchema = new mongoose.Schema(
     },
     bookingStatus: { 
       type: String, 
-      enum: ['CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], 
+      enum: ['CONFIRMED', 'IN_PROGRESS', 'AWAITING_CLIENT_CONFIRMATION', 'AWAITING_ADMIN_REVIEW', 'DISPUTED', 'COMPLETED', 'CANCELLED'], 
       default: 'CONFIRMED' 
     },
     specialRequests: { type: String },

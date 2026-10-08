@@ -57,7 +57,7 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
       Booking.countDocuments({ vendor: vendorObjectId, bookingStatus: 'COMPLETED' }),
       Booking.countDocuments({
         vendor: vendorObjectId,
-        bookingStatus: { $in: ['CONFIRMED', 'IN_PROGRESS'] },
+        bookingStatus: { $in: ['CONFIRMED', 'IN_PROGRESS', 'AWAITING_CLIENT_CONFIRMATION', 'AWAITING_ADMIN_REVIEW', 'DISPUTED'] },
       }),
       Payment.countDocuments({ vendor: vendorObjectId }),
       Payment.aggregate([

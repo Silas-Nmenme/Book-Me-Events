@@ -151,6 +151,7 @@ safeRoute('/api/v1/users', require('./src/routes/userActivityRoutes'));
 // VENDOR MVP: analytics/sla/tickets/promotions
 safeRoute('/api/v1/tickets', require('./src/routes/ticketRoutes'));
 safeRoute('/api/v1/reports', require('./src/routes/userReportRoutes'));
+safeRoute('/api/v1/completion-reports', require('./src/routes/completionReportRoutes'));
 
 // ADMIN MVP: fraud signals
 safeRoute('/api/v1/fraud', require('./src/routes/fraudSignalsRoutes'));
