@@ -2,8 +2,11 @@ const asyncHandler = require('express-async-handler');
 const Request = require('../models/Request');
 const Service = require('../models/Service');
 const Vendor = require('../models/Vendor');
+const User = require('../models/User');
+const { sendEmail } = require('../utils/emailClient');
 const { validatePagination, validatePositiveNumber } = require('../utils/inputValidator');
 const { isResourceOwner } = require('../utils/authorizationHelper');
+const { newServiceRequestVendorEmail } = require('../utils/emailTemplates');
 
 // @desc    Get all requests
 // @route   GET /api/v1/requests
@@ -193,7 +196,34 @@ const request = await Request.create({
     severity: 'ACTION',
   });
 
+  try {
+    const vendorDoc = await Vendor.findById(vendor).populate('user', 'firstName lastName email');
+    const userDoc = await User.findById(req.user.id).select('firstName lastName email');
+    const emailTemplate = newServiceRequestVendorEmail({
+      vendorName: vendorDoc?.businessName || 'Vendor',
+      userName: `${userDoc?.firstName || ''} ${userDoc?.lastName || ''}`.trim() || userDoc?.email || 'Customer',
+      userEmail: userDoc?.email || 'customer@example.com',
+      serviceName: serviceExists?.serviceName || 'Service',
+      requestId: request._id,
+      requestDate: request.createdAt,
+      requestedDateTime: request.eventDate,
+      location: request.eventLocation,
+      amount: request.budgetAmount,
+      description: request.eventDescription,
+      requestUrl: `${process.env.FRONTEND_URL || process.env.CLIENT_URL || 'https://bookmeevent.netlify.app'}/Frontend/pages/vendor-service.html?requestId=${request._id}`,
+    });
 
+    if (vendorDoc?.user?.email) {
+      await sendEmail({
+        to: vendorDoc.user.email,
+        subject: emailTemplate.subject,
+        text: emailTemplate.text,
+        html: emailTemplate.html,
+      });
+    }
+  } catch (emailError) {
+    console.error('Vendor service request notification email failed:', emailError?.message || emailError);
+  }
 
   res.status(201).json({
     success: true,
@@ -201,7 +231,6 @@ const request = await Request.create({
     data: request,
   });
 });
-
 
 // @desc    Accept service request (Vendor)
 // @route   PUT /api/v1/requests/:id/accept
@@ -214,7 +243,6 @@ exports.acceptRequest = asyncHandler(async (req, res) => {
     throw new Error('Request not found');
   }
 
-  // req.user is a User, while request.vendor is a Vendor._id.
   if (req.user.role !== 'ADMIN') {
     const vendor = await Vendor.findOne({ user: req.user.id || req.user._id });
     const myVendorId = vendor?._id;

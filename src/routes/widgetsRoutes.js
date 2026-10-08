@@ -44,7 +44,13 @@ router.get('/preview', protect, getMessagesPreview);
 
 
 // Vendors for map: spec is /api/v1/vendors?city=&category=&limit=
-router.get('/vendors', protect, getVendorsForMap);
+router.get('/vendors', (req, res, next) => {
+  const { city, category, limit } = req.query;
+  if (city || category || limit) {
+    return getVendorsForMap(req, res, next);
+  }
+  return next();
+});
 
 
 

@@ -457,17 +457,14 @@
           document.getElementById('announcementBellMarkAllRead')?.addEventListener('click', async (e) => {
             e.preventDefault();
 
-            const dotEl = document.getElementById('announcementBellDot');
-            if (dotEl) {
-              dotEl.textContent = '';
-              dotEl.style.display = 'none';
-            }
-
             try {
+              const { markAllAnnouncementsRead, initAnnouncements } = await import('./../js/pages/announcements.js');
+              await markAllAnnouncementsRead();
               await initAnnouncements({ role });
-            } catch {}
-
-            toast({ title: 'Marked', message: 'Announcements marked as read (best-effort).', variant: 'success' });
+              toast({ title: 'Marked', message: 'Announcements marked as read.', variant: 'success' });
+            } catch (err) {
+              toast({ title: 'Failed', message: err?.message || 'Could not mark announcements as read.', variant: 'danger' });
+            }
           });
         } catch {}
       }

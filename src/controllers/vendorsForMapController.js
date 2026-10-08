@@ -40,6 +40,6 @@ exports.getVendorsForMap = asyncHandler(async (req, res) => {
     };
   });
 
-  return res.status(200).json({ success: true, data: items, message: 'Vendors for map fetched' });
+  return res.status(200).json({ success: true, data: items, items, message: 'Vendors for map fetched' });
 });
 

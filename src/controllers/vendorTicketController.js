@@ -25,29 +25,41 @@ exports.getMyTickets = asyncHandler(async (req, res) => {
   const candidates = await SupportTicket.find(filter)
     .populate({
       path: 'booking',
-      populate: { path: 'request', select: '_id vendor', populate: { path: 'vendor', select: '_id' } },
+      select: '_id vendor request',
+      populate: { path: 'vendor', select: '_id' },
     })
     .populate({
       path: 'request',
+      select: '_id vendor',
+      populate: { path: 'vendor', select: '_id' },
     })
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(safeLimit)
     .lean();
 
+  const myVendorId = vendor._id.toString();
+
   // Post-filter by derived vendor ownership.
   const filtered = candidates.filter((t) => {
     const reqVendor = t?.request?.vendor?._id || t?.request?.vendor || null;
     const bookingVendor = t?.booking?.vendor?._id || t?.booking?.vendor || null;
-    const myVendorId = vendor._id.toString();
     return (reqVendor && reqVendor.toString() === myVendorId) || (bookingVendor && bookingVendor.toString() === myVendorId);
   });
 
   // Total approximation: MVP keeps total small; for accuracy we'd compute in DB with lookups.
   // We recompute total by fetching without pagination (limit for MVP).
   const totalCandidates = await SupportTicket.find(filter)
-    .populate('booking')
-    .populate('request')
+    .populate({
+      path: 'booking',
+      select: '_id vendor request',
+      populate: { path: 'vendor', select: '_id' },
+    })
+    .populate({
+      path: 'request',
+      select: '_id vendor',
+      populate: { path: 'vendor', select: '_id' },
+    })
     .sort({ createdAt: -1 })
     .limit(500)
     .lean();
@@ -55,7 +67,6 @@ exports.getMyTickets = asyncHandler(async (req, res) => {
   const totalFiltered = totalCandidates.filter((t) => {
     const reqVendor = t?.request?.vendor?._id || t?.request?.vendor || null;
     const bookingVendor = t?.booking?.vendor?._id || t?.booking?.vendor || null;
-    const myVendorId = vendor._id.toString();
     return (reqVendor && reqVendor.toString() === myVendorId) || (bookingVendor && bookingVendor.toString() === myVendorId);
   });
 

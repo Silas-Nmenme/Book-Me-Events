@@ -1,12 +1,15 @@
 const asyncHandler = require('express-async-handler');
+const mongoose = require('mongoose');
 const Vendor = require('../models/Vendor');
+const Service = require('../models/Service');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
 const Review = require('../models/Review');
 const Request = require('../models/Request');
+const Message = require('../models/Message');
+const SupportTicket = require('../models/SupportTicket');
 
-// VENDOR: analytics derived from existing domain models.
-// Keeps MVP minimal: no persistence, just computed views.
+// VENDOR: analytics derived from the real data model owned by the authenticated vendor.
 exports.getVendorAnalytics = asyncHandler(async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
@@ -14,59 +17,69 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized: missing user id' });
     }
 
-    // Prevent Mongoose CastErrors from unexpected token contents.
-    const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(String(userId))) {
       return res.status(401).json({ success: false, message: 'Unauthorized: invalid user id token' });
     }
 
-    const vendor = await Vendor.findOne({ user: userId });
+    const vendor = await Vendor.findOne({ user: userId }).select('_id user');
     if (!vendor) {
       return res.status(403).json({ success: false, message: 'Vendor profile not found' });
     }
 
+    const vendorObjectId = vendor._id;
+    const vendorUserObjectId = vendor.user;
+
     const [
+      totalServices,
+      activeServices,
+      pendingRequests,
+      acceptedRequests,
+      completedRequests,
+      cancelledRequests,
       totalBookings,
       completedBookings,
       pendingBookings,
-      incomingRequests,
-      acceptedRequests,
+      totalPayments,
       totalRevenueAgg,
       avgRatingAgg,
       reviewsCount,
       paymentsByMethodAgg,
+      unreadMessages,
+      openSupportTickets,
     ] = await Promise.all([
-      Booking.countDocuments({ vendor: vendor._id }),
-      Booking.countDocuments({ vendor: vendor._id, bookingStatus: 'COMPLETED' }),
+      Service.countDocuments({ vendor: vendorObjectId }),
+      Service.countDocuments({ vendor: vendorObjectId, availabilityStatus: 'AVAILABLE' }),
+      Request.countDocuments({ vendor: vendorObjectId, status: 'PENDING' }),
+      Request.countDocuments({ vendor: vendorObjectId, status: 'ACCEPTED' }),
+      Request.countDocuments({ vendor: vendorObjectId, status: 'COMPLETED' }),
+      Request.countDocuments({ vendor: vendorObjectId, status: 'CANCELLED' }),
+      Booking.countDocuments({ vendor: vendorObjectId }),
+      Booking.countDocuments({ vendor: vendorObjectId, bookingStatus: 'COMPLETED' }),
       Booking.countDocuments({
-        vendor: vendor._id,
+        vendor: vendorObjectId,
         bookingStatus: { $in: ['CONFIRMED', 'IN_PROGRESS'] },
       }),
-      Request.countDocuments({ vendor: vendor._id, status: 'PENDING' }),
-      Request.countDocuments({ vendor: vendor._id, status: 'ACCEPTED' }),
-
+      Payment.countDocuments({ vendor: vendorObjectId }),
       Payment.aggregate([
-        { $match: { vendor: vendor._id, paymentStatus: 'COMPLETED' } },
+        { $match: { vendor: vendorObjectId, paymentStatus: 'COMPLETED' } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
-
       Review.aggregate([
-        { $match: { vendor: vendor._id } },
+        { $match: { vendor: vendorObjectId } },
         { $group: { _id: null, avg: { $avg: '$rating' } } },
       ]),
-
-      Review.countDocuments({ vendor: vendor._id }),
-
+      Review.countDocuments({ vendor: vendorObjectId }),
       Payment.aggregate([
-        { $match: { vendor: vendor._id, paymentStatus: 'COMPLETED' } },
-        {
-          $group: {
-            _id: '$paymentMethod',
-            count: { $sum: 1 },
-            total: { $sum: '$amount' },
-          },
-        },
+        { $match: { vendor: vendorObjectId, paymentStatus: 'COMPLETED' } },
+        { $group: { _id: '$paymentMethod', count: { $sum: 1 }, total: { $sum: '$amount' } } },
       ]),
+      Message.countDocuments({ recipient: vendorUserObjectId, isRead: false }),
+      SupportTicket.countDocuments({
+        $or: [
+          { request: { $in: await Request.find({ vendor: vendorObjectId }).distinct('_id') } },
+          { booking: { $in: await Booking.find({ vendor: vendorObjectId }).distinct('_id') } },
+        ],
+      }),
     ]);
 
     const totalRevenue = Number(totalRevenueAgg?.[0]?.total ?? 0) || 0;
@@ -77,16 +90,24 @@ exports.getVendorAnalytics = asyncHandler(async (req, res) => {
     return res.status(200).json({
       success: true,
       data: {
-        vendor: vendor._id,
+        vendor: vendorObjectId,
+        totalServices,
+        activeServices,
+        pendingRequests,
+        incomingRequests: pendingRequests,
+        acceptedRequests,
+        completedRequests,
+        cancelledRequests,
         totalBookings,
         completedBookings,
         pendingBookings,
-        incomingRequests,
-        acceptedRequests,
+        totalPayments,
         totalRevenue,
         averageRating: averageRatingRounded,
         totalReviews: reviewsCount,
         paymentsByMethod: paymentsByMethodAgg,
+        unreadMessages,
+        openSupportTickets,
       },
     });
   } catch (err) {

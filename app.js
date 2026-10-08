@@ -115,6 +115,11 @@ const safeRoute = (path, route) => {
  */
 safeRoute('/api/v1/auth', require('./src/routes/authRoutes'));
 safeRoute('/api/v1/users', require('./src/routes/userRoutes'));
+
+// Platform/widget endpoints are intentionally mounted before generic vendor routes
+// so query-based vendor map requests can resolve without clobbering the list API.
+safeRoute('/api/v1', require('./src/routes/widgetsRoutes'));
+
 // Vendor analytics/SLA routes must be mounted before generic /:id vendor routes.
 safeRoute('/api/v1/vendors', require('./src/routes/vendorAnalyticsRoutes'));
 safeRoute('/api/v1/vendors', require('./src/routes/vendorRoutes'));
@@ -132,10 +137,6 @@ safeRoute('/api/v1/admin', require('./src/routes/adminRoutes'));
 
 // Dashboard analytics (user/vendor)
 safeRoute('/api/v1/dashboard', require('./src/routes/dashboardRoutes'));
-
-// Platform/widget endpoints (match spec URLs)
-safeRoute('/api/v1', require('./src/routes/widgetsRoutes'));
-
 
 safeRoute('/api/v1/announcements', require('./src/routes/announcementRoutes'));
 

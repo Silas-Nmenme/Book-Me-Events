@@ -346,7 +346,7 @@ export async function initRequestsPage({ me, role } = {}) {
     openCreateRequestModal(requestModal, requestModalEl, serviceInput, servicePreviewEl);
   });
 
-  // Prefill from services.html: requests.html?prefillServiceId=...
+  // Prefill from services.html: user-request.html?serviceId=...
   const prefillServiceId = qs('prefillServiceId') || qs('serviceId') || qs('service');
   const prefillShouldOpen = !!prefillServiceId;
 

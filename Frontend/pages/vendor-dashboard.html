@@ -27,6 +27,7 @@
         <div class="bme-sidebar__section-label">Dashboard</div>
         <div class="d-flex flex-column gap-1">
           <a class="bme-nav-link active" href="vendor-dashboard.html">Dashboard</a>
+          <a class="bme-nav-link" href="vendor-edit-profile.html">Edit public profile</a>
           <a class="bme-nav-link" href="services.html">Manage services</a>
           <a class="bme-nav-link" href="vendor-service.html">Incoming requests</a>
           <a class="bme-nav-link" href="bookings.html">Bookings</a>
@@ -165,6 +166,12 @@
                   <div class="bme-stat-card h-100">
                     <div class="bme-stat-card__label">SLA breach rate</div>
                     <div class="bme-stat-card__value" id="vStatBreachRate">—</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-4">
+                  <div class="bme-stat-card h-100">
+                    <div class="bme-stat-card__label">Open support tickets</div>
+                    <div class="bme-stat-card__value" id="vStatSupportTickets">—</div>
                   </div>
                 </div>
               </div>
@@ -320,6 +327,37 @@
       setYear('year');
       initThemeToggle();
 
+      const sidebar = document.getElementById('vendorSidebar');
+      const sidebarBackdrop = document.getElementById('vendorSidebarBackdrop');
+      const sidebarOpenBtn = document.getElementById('vendorSidebarOpen');
+      const sidebarCloseBtn = document.getElementById('vendorSidebarClose');
+
+      const closeSidebar = () => {
+        sidebar?.classList.remove('open');
+        sidebarBackdrop?.classList.remove('show');
+        document.body.style.overflow = '';
+      };
+
+      const openSidebar = () => {
+        sidebar?.classList.add('open');
+        sidebarBackdrop?.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      };
+
+      sidebarOpenBtn?.addEventListener('click', openSidebar);
+      sidebarCloseBtn?.addEventListener('click', closeSidebar);
+      sidebarBackdrop?.addEventListener('click', closeSidebar);
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeSidebar();
+      });
+
+      document.querySelectorAll('.bme-nav-link').forEach((link) => {
+        link.addEventListener('click', () => {
+          closeSidebar();
+          document.querySelectorAll('.bme-nav-link').forEach((item) => item.classList.remove('active'));
+          link.classList.add('active');
+        });
+      });
 
       const avatarEl = document.getElementById('avatar');
 
@@ -433,20 +471,14 @@
           document.getElementById('announcementBellMarkAllRead')?.addEventListener('click', async (e) => {
             e.preventDefault();
 
-            // Best-effort UX: since backend currently doesn’t track per-user read status,
-            // clear the bell badge immediately and refresh the bell dropdown preview.
-            const dotEl = document.getElementById('announcementBellDot');
-            if (dotEl) {
-              dotEl.textContent = '';
-              dotEl.style.display = 'none';
-            }
-
             try {
-              // Refresh bell UI so it stays consistent with the current announcements.
-              await import('../js/pages/announcements.js').then(m => m.initAnnouncements({ role }));
-            } catch {}
-
-            toast({ title: 'Marked', message: 'Announcements marked as read (best-effort).', variant: 'success' });
+              const { markAllAnnouncementsRead, initAnnouncements } = await import('../js/pages/announcements.js');
+              await markAllAnnouncementsRead();
+              await initAnnouncements({ role });
+              toast({ title: 'Marked', message: 'Announcements marked as read.', variant: 'success' });
+            } catch (err) {
+              toast({ title: 'Failed', message: err?.message || 'Could not mark announcements as read.', variant: 'danger' });
+            }
           });
         } catch {}
       });

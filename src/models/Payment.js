@@ -15,7 +15,7 @@ const paymentSchema = new mongoose.Schema(
     transactionReference: { type: String, unique: true, required: true },
     paymentStatus: { 
       type: String, 
-      enum: ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'], 
+      enum: ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED', 'CANCELLED'], 
       default: 'PENDING' 
     },
     paymentGateway: { type: String },

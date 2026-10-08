@@ -759,6 +759,69 @@ function vendorPaymentNotificationEmail({ vendorName, bookingId, amount, currenc
   return { subject, text, html };
 }
 
+function newServiceRequestVendorEmail({ vendorName, userName, userEmail, serviceName, requestId, requestDate, requestedDateTime, location, amount, description, requestUrl }) {
+  const safeVendorName = escapeHtml(vendorName || 'Vendor');
+  const safeUserName = escapeHtml(userName || 'A customer');
+  const safeUserEmail = escapeHtml(userEmail || 'customer@example.com');
+  const safeServiceName = escapeHtml(serviceName || 'Service');
+  const safeRequestId = safeStr(requestId, '—');
+  const safeRequestDate = formatDate(requestDate) || escapeHtml(requestDate || 'Today');
+  const safeRequestedDateTime = formatDate(requestedDateTime) || escapeHtml(requestedDateTime || 'Not specified');
+  const safeLocation = escapeHtml(location || 'Not specified');
+  const safeAmount = amount != null ? formatCurrency(amount, 'NGN') : 'Not specified';
+  const safeDescription = escapeHtml(description || 'No additional notes');
+  const safeRequestUrl = safeStr(requestUrl, `${FRONTEND_URL}/Frontend/pages/vendor-service.html`);
+
+  const subject = `New Service Request Received - ${APP_NAME}`;
+  const text = toPlainText({
+    lines: [
+      `Hi ${safeVendorName},`,
+      'A new service request has been submitted for your business.',
+      `Customer: ${safeUserName}`,
+      `Email: ${safeUserEmail}`,
+      `Service: ${safeServiceName}`,
+      `Request ID: ${safeRequestId}`,
+      `Request date: ${safeRequestDate}`,
+      `Preferred date: ${safeRequestedDateTime}`,
+      `Location: ${safeLocation}`,
+      `Budget: ${safeAmount}`,
+      `Description: ${safeDescription}`,
+      'Please review the request and respond as soon as possible.',
+    ],
+  });
+
+  const bodyInnerHtml = `
+    <p style="margin:0 0 12px;font-size:14px;color:#0f172a;font-family:DM Sans, Arial, Helvetica, sans-serif;">Hi <strong>${safeVendorName}</strong>,</p>
+    <p style="margin:0 0 16px;font-size:13px;color:#475569;line-height:1.7;font-family:DM Sans, Arial, Helvetica, sans-serif;">
+      A new service request has been received for <strong>${safeServiceName}</strong>. Review the customer details and respond promptly.
+    </p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:14px;background:#F8FAFC;">
+      ${buildKeyValueRows([
+        { label: 'Customer', value: safeUserName },
+        { label: 'Email', value: safeUserEmail },
+        { label: 'Service', value: safeServiceName },
+        { label: 'Request ID', value: safeRequestId },
+        { label: 'Request date', value: safeRequestDate },
+        { label: 'Preferred date', value: safeRequestedDateTime },
+        { label: 'Location', value: safeLocation },
+        { label: 'Budget', value: safeAmount },
+        { label: 'Description', value: safeDescription },
+      ])}
+    </table>
+  `;
+
+  const html = buildBaseEmail({
+    title: 'New Service Request Received',
+    statusLabel: 'Action required',
+    bodyInnerHtml,
+    ctaText: 'Review request',
+    ctaHref: safeRequestUrl,
+  });
+
+  return { subject, text, html };
+}
+
 module.exports = {
   welcomeEmail,
   otpVerificationEmail,
@@ -773,5 +836,6 @@ module.exports = {
   bookingCreatedEmail,
   paymentReceiptEmail,
   vendorPaymentNotificationEmail,
+  newServiceRequestVendorEmail,
 };
 

@@ -7,6 +7,12 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_REGEX = /^[\d+\-\s()]{10,15}$/;
 const PASSWORD_MIN_LENGTH = 8;
 const BUSINESS_REG_REGEX = /^[A-Z0-9]{5,20}$/;
+const NIGERIAN_STATES = [
+  'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River',
+  'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano',
+  'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo',
+  'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara', 'Abuja', 'Abuja/FCT', 'Rivers', 'Delta', 'Oyo', 'Lagos', 'Ogun'
+];
 
 /**
  * Validate email format
@@ -156,7 +162,124 @@ function sanitizeString(str) {
     .replace(/[<>\"'`]/g, '') // Remove HTML-like chars
     .substring(0, 5000); // Max length
 }
+function validateVendorBio(bio, maxLength = 1200) {
+  if (bio === undefined || bio === null || bio === '') return { valid: true, value: '' };
+  const trimmed = sanitizeString(String(bio)).substring(0, maxLength);
+  if (trimmed.length < 20) {
+    return { valid: false, error: 'Vendor bio must be at least 20 characters.' };
+  }
+  if (trimmed.length > maxLength) {
+    return { valid: false, error: `Vendor bio must be ${maxLength} characters or less.` };
+  }
+  return { valid: true, value: trimmed };
+}
 
+function validateVendorUrl(url, fieldName = 'Link') {
+  if (url === undefined || url === null || url === '') return { valid: true, value: '' };
+  const trimmed = sanitizeString(String(url)).trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return { valid: false, error: `${fieldName} must start with http:// or https://` };
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return { valid: false, error: `${fieldName} must use a valid HTTP/HTTPS URL.` };
+    }
+  } catch {
+    return { valid: false, error: `${fieldName} is not a valid URL.` };
+  }
+  return { valid: true, value: trimmed };
+}
+
+function validateVendorCoverageStates(states, { min = 2, max = 10 } = {}) {
+  const arr = Array.isArray(states) ? states : [];
+  const normalized = [...new Set(arr.map((state) => sanitizeString(String(state)).trim()).filter(Boolean))];
+
+  if (normalized.length === 0) {
+    return { valid: true, value: [] };
+  }
+
+  if (normalized.length < min) {
+    return { valid: false, error: `Select at least ${min} states you can cover.` };
+  }
+  if (normalized.length > max) {
+    return { valid: false, error: `You can select up to ${max} states.` };
+  }
+
+  const invalid = normalized.filter((state) => !NIGERIAN_STATES.map((s) => s.toLowerCase()).includes(String(state).toLowerCase()));
+  if (invalid.length > 0) {
+    return { valid: false, error: `Invalid state selected: ${invalid[0]}` };
+  }
+
+  return { valid: true, value: normalized };
+}
+
+function validateVendorLocation(location) {
+  if (!location || typeof location !== 'object') {
+    return { valid: false, error: 'Current location is required.' };
+  }
+
+  const city = sanitizeString(String(location.city || '')).trim();
+  const state = sanitizeString(String(location.state || '')).trim();
+
+  if (!city || !state) {
+    return { valid: false, error: 'Current location requires both city and state.' };
+  }
+
+  if (city.length > 80 || state.length > 80) {
+    return { valid: false, error: 'City and state are too long.' };
+  }
+
+  return { valid: true, value: { city, state } };
+}
+
+function validateVendorReview(review, index = 0) {
+  if (!review || typeof review !== 'object') {
+    return { valid: false, error: `Review ${index + 1} is invalid.` };
+  }
+  const reviewerName = sanitizeString(String(review.reviewerName || '')).trim();
+  const reviewText = sanitizeString(String(review.reviewText || '')).trim();
+  const rating = Number(review.rating);
+
+  if (!reviewerName || reviewerName.length > 120) {
+    return { valid: false, error: `Review ${index + 1} requires a valid reviewer name.` };
+  }
+  if (!reviewText || reviewText.length < 20 || reviewText.length > 800) {
+    return { valid: false, error: `Review ${index + 1} must be between 20 and 800 characters.` };
+  }
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+    return { valid: false, error: `Review ${index + 1} rating must be between 1 and 5.` };
+  }
+
+  return {
+    valid: true,
+    value: {
+      reviewerName,
+      reviewText,
+      rating: Math.round(rating),
+      reviewDate: review.reviewDate ? new Date(review.reviewDate) : undefined,
+      image: review.image ? sanitizeString(String(review.image)).trim() : '',
+      isVerifiedPlatformReview: Boolean(review.isVerifiedPlatformReview),
+    },
+  };
+}
+
+function validateVendorReviews(reviews) {
+  if (!reviews) return { valid: true, value: [] };
+  const list = Array.isArray(reviews) ? reviews : [reviews];
+  if (list.length > 5) {
+    return { valid: false, error: 'Maximum of 5 previous job reviews allowed.' };
+  }
+
+  const normalized = [];
+  for (let i = 0; i < list.length; i += 1) {
+    const result = validateVendorReview(list[i], i);
+    if (!result.valid) return result;
+    normalized.push(result.value);
+  }
+
+  return { valid: true, value: normalized };
+}
 /**
  * Sanitize object - recursively sanitize string values
  */
@@ -215,4 +338,10 @@ module.exports = {
   sanitizeObject,
   validatePagination,
   validateMongoId,
+  validateVendorBio,
+  validateVendorUrl,
+  validateVendorCoverageStates,
+  validateVendorLocation,
+  validateVendorReviews,
+  NIGERIAN_STATES,
 };

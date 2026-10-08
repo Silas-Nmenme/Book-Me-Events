@@ -22,14 +22,19 @@ exports.getMessagesPreview = asyncHandler(async (req, res) => {
   const threads = [];
 
   for (const m of messages) {
-    const senderId = String(m.sender._id);
-    const recipientId = String(m.recipient._id);
+    if (!m?.sender || !m?.recipient) continue;
+
+    const senderId = String(m.sender._id || '');
+    const recipientId = String(m.recipient._id || '');
+    if (!senderId || !recipientId) continue;
+
     const otherUserId = senderId === String(userId) ? recipientId : senderId;
     const key = [senderId, recipientId].sort().join(':');
     if (seen.has(key)) continue;
     seen.add(key);
 
     const other = senderId === String(userId) ? m.recipient : m.sender;
+    const otherDisplayName = `${other?.firstName || ''} ${other?.lastName || ''}`.trim() || 'User';
     const lastMessage = {
       content: m.messageContent,
       createdAt: m.createdAt,
@@ -43,11 +48,11 @@ exports.getMessagesPreview = asyncHandler(async (req, res) => {
 
     threads.push({
       vendor: {
-        _id: other._id,
-        name: `${other.firstName || ''} ${other.lastName || ''}`.trim() || 'Vendor',
-        profilePicture: other.profilePicture,
+        _id: other?._id || otherUserId,
+        name: otherDisplayName,
+        profilePicture: other?.profilePicture || null,
       },
-      vendorId: other._id,
+      vendorId: other?._id || otherUserId,
       otherUserId,
       conversationId: m.conversationId,
       lastMessage,

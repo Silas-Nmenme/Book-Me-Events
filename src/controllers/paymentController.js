@@ -317,7 +317,7 @@ exports.getPayments = async (req, res) => {
     let filter = {};
 
     if (status) {
-      const validStatuses = ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED'];
+      const validStatuses = ['PENDING', 'COMPLETED', 'FAILED', 'REFUNDED', 'CANCELLED'];
       if (validStatuses.includes(status.toUpperCase())) {
         filter.paymentStatus = status.toUpperCase();
       }

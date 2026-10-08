@@ -4,6 +4,7 @@ const { protect, authorize } = require('../middlewares/authMiddleware');
 const {
   getVendors,
   getVendor,
+  getMyVendor,
   createVendor,
   updateVendor,
   deleteVendor,
@@ -13,6 +14,7 @@ const {
 } = require('../controllers/vendorController');
 // Public routes
 router.get('/', getVendors);
+router.get('/me', protect, authorize('VENDOR'), getMyVendor);
 router.get('/:id', getVendor);
 router.get('/:id/services', getVendorServices);
 router.get('/:id/reviews', getVendorReviews);

@@ -8,7 +8,16 @@ const {
   vendorVerificationRequestedEmail,
   adminNewVendorApprovalRequestEmail,
 } = require('../utils/emailTemplates');
-const { validatePagination, validateBusinessName, sanitizeString } = require('../utils/inputValidator');
+const {
+  validatePagination,
+  validateBusinessName,
+  sanitizeString,
+  validateVendorBio,
+  validateVendorUrl,
+  validateVendorCoverageStates,
+  validateVendorLocation,
+  validateVendorReviews,
+} = require('../utils/inputValidator');
 const { isResourceOwner } = require('../utils/authorizationHelper');
 
 // ===============================
@@ -39,6 +48,142 @@ async function sendVendorOtpEmail({ user }) {
     text,
     html,
   });
+}
+
+function normalizeStringList(list, maxItems = 20) {
+  if (!Array.isArray(list)) return [];
+  const normalized = list
+    .map((item) => sanitizeString(String(item || '')).trim())
+    .filter(Boolean)
+    .slice(0, maxItems);
+  return [...new Set(normalized)];
+}
+
+function normalizeGalleryItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => {
+      const rawUrl = typeof item === 'string' ? item : item?.url || item?.image || item?.src;
+      if (!rawUrl) return null;
+
+      const urlResult = validateVendorUrl(rawUrl, 'Gallery image URL');
+      if (!urlResult.valid) throw new Error(urlResult.error);
+
+      return {
+        url: urlResult.value,
+        publicId: sanitizeString(String(item?.publicId || item?.public_id || '')).trim(),
+        caption: sanitizeString(String(item?.caption || item?.title || '')).trim().substring(0, 220),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 30);
+}
+
+function normalizeSocialLinks(socialLinks = {}) {
+  const safe = {};
+  const entries = [
+    ['facebook', 'Facebook'],
+    ['instagram', 'Instagram'],
+    ['tiktok', 'TikTok'],
+    ['whatsapp', 'WhatsApp'],
+  ];
+
+  entries.forEach(([key, label]) => {
+    const value = socialLinks && socialLinks[key] !== undefined ? socialLinks[key] : '';
+    if (!value || value === null || value === '') return;
+    const result = validateVendorUrl(value, label);
+    if (!result.valid) {
+      throw new Error(result.error);
+    }
+    safe[key] = result.value;
+  });
+
+  return safe;
+}
+
+function getVendorProfileUpdateData(body = {}) {
+  const updateData = {};
+
+  if (body.businessName !== undefined) {
+    const businessNameVal = validateBusinessName(body.businessName);
+    if (!businessNameVal.valid) throw new Error(businessNameVal.error);
+    updateData.businessName = businessNameVal.value;
+  }
+
+  if (body.businessDescription !== undefined && body.businessDescription !== null) {
+    const desc = sanitizeString(String(body.businessDescription)).substring(0, 2000);
+    updateData.businessDescription = desc;
+  }
+
+  if (body.bio !== undefined) {
+    const bioResult = validateVendorBio(body.bio, 1200);
+    if (!bioResult.valid) throw new Error(bioResult.error);
+    updateData.bio = bioResult.value;
+  }
+
+  if (body.testimonial !== undefined) {
+    const testimonial = sanitizeString(String(body.testimonial || '')).substring(0, 800);
+    updateData.testimonial = testimonial;
+  }
+
+  if (body.serviceCategories !== undefined) {
+    updateData.serviceCategories = normalizeStringList(body.serviceCategories, 20);
+  }
+
+  if (body.coverageAreas !== undefined) {
+    updateData.coverageAreas = normalizeStringList(body.coverageAreas, 20);
+  }
+
+  if (body.serviceCoverageStates !== undefined) {
+    const coverageResult = validateVendorCoverageStates(body.serviceCoverageStates, { min: 2, max: 10 });
+    if (!coverageResult.valid) throw new Error(coverageResult.error);
+    updateData.serviceCoverageStates = coverageResult.value;
+  }
+
+  if (body.currentLocation !== undefined) {
+    const locationResult = validateVendorLocation(body.currentLocation);
+    if (!locationResult.valid) throw new Error(locationResult.error);
+    updateData.currentLocation = locationResult.value;
+  }
+
+  if (body.socialLinks !== undefined) {
+    updateData.socialLinks = normalizeSocialLinks(body.socialLinks);
+  }
+
+  if (body.profilePicture !== undefined && body.profilePicture !== null && body.profilePicture !== '') {
+    const pictureResult = validateVendorUrl(body.profilePicture, 'Profile picture URL');
+    if (!pictureResult.valid) throw new Error(pictureResult.error);
+    updateData.profilePicture = pictureResult.value;
+  }
+
+  if (body.gallery !== undefined) {
+    const gallery = normalizeGalleryItems(body.gallery);
+    updateData.gallery = gallery;
+  }
+
+  if (body.previousReviews !== undefined) {
+    const reviewsResult = validateVendorReviews(body.previousReviews);
+    if (!reviewsResult.valid) throw new Error(reviewsResult.error);
+    updateData.previousReviews = reviewsResult.value;
+  }
+
+  if (body.businessRegistrationNumber !== undefined) {
+    updateData.businessRegistrationNumber = sanitizeString(String(body.businessRegistrationNumber)).substring(0, 50);
+  }
+
+  if (body.taxId !== undefined) {
+    updateData.taxId = sanitizeString(String(body.taxId)).substring(0, 50);
+  }
+
+  if (body.bankAccountNumber !== undefined) {
+    updateData.bankAccountNumber = sanitizeString(String(body.bankAccountNumber)).substring(0, 50);
+  }
+
+  if (body.bankName !== undefined) {
+    updateData.bankCode = sanitizeString(String(body.bankName)).substring(0, 100);
+  }
+
+  return updateData;
 }
 
 // ===============================
@@ -112,17 +257,20 @@ exports.vendorRegisterPage2 = asyncHandler(async (req, res) => {
     bankAccountNumber,
     bankName,
     businessDescription,
+    bio,
+    testimonial,
     serviceCategories,
     coverageAreas,
+    serviceCoverageStates,
+    currentLocation,
+    socialLinks,
+    profilePicture,
+    gallery,
+    previousReviews,
     nin,
   } = req.body;
 
-  // passport photograph comes from frontend upload endpoint or will be sent as URL.
-  const passportPhotograph = req.body.passportPhotograph || req.body.passportPhoto || req.body.passportPhotoUrl;
-
-  // Ensure schema fields exist (legacy schema may not include them yet)
-  const normalizedNin = nin ? nin.toString() : undefined;
-
+  const passportPhotograph = req.body.passportPhotograph || req.body.passportPhoto || req.body.passportPhotoUrl || profilePicture;
 
   if (!email) {
     res.status(400);
@@ -139,37 +287,50 @@ exports.vendorRegisterPage2 = asyncHandler(async (req, res) => {
     throw new Error('Vendor account not found');
   }
 
-  const normalizedServiceCategories = Array.isArray(serviceCategories) ? serviceCategories : [];
-  const normalizedCoverageAreas = Array.isArray(coverageAreas) ? coverageAreas : [];
+  if (user.isVerified) {
+    res.status(403);
+    throw new Error('Verified vendor profiles must be updated from the authenticated dashboard.');
+  }
+
+  const validProfile = getVendorProfileUpdateData({
+    businessName,
+    businessDescription,
+    bio,
+    testimonial,
+    serviceCategories,
+    coverageAreas,
+    serviceCoverageStates,
+    currentLocation,
+    socialLinks,
+    profilePicture: passportPhotograph || profilePicture,
+    gallery,
+    previousReviews,
+    businessRegistrationNumber,
+    taxId,
+    bankAccountNumber,
+    bankName,
+  });
 
   let vendor = await Vendor.findOne({ user: user._id });
   if (!vendor) {
     vendor = await Vendor.create({
       user: user._id,
-      businessName,
-      businessRegistrationNumber,
-      taxId,
-      bankAccountNumber,
-      bankCode: bankName, // legacy schema uses bankCode
-      businessDescription,
-      serviceCategories: normalizedServiceCategories,
-      coverageAreas: normalizedCoverageAreas,
+      ...validProfile,
       responseTimeHours: 24,
       nin,
       passportPhotograph,
     });
   } else {
-    vendor.businessName = businessName;
-    vendor.businessRegistrationNumber = businessRegistrationNumber;
-    vendor.taxId = taxId;
-    vendor.bankAccountNumber = bankAccountNumber;
-    vendor.bankCode = bankName;
-    vendor.businessDescription = businessDescription;
-    vendor.serviceCategories = normalizedServiceCategories;
-    vendor.coverageAreas = normalizedCoverageAreas;
-    vendor.nin = nin;
-    vendor.passportPhotograph = passportPhotograph;
+    Object.assign(vendor, validProfile, {
+      nin,
+      passportPhotograph,
+    });
     await vendor.save();
+  }
+
+  if (passportPhotograph || profilePicture) {
+    user.profilePicture = passportPhotograph || profilePicture;
+    await user.save();
   }
 
   return res.status(200).json({
@@ -177,6 +338,21 @@ exports.vendorRegisterPage2 = asyncHandler(async (req, res) => {
     message: 'Vendor profile saved. Continue to OTP verification.',
     data: { email: user.email },
   });
+});
+
+// @desc    Get the authenticated vendor's own profile
+// @route   GET /api/v1/vendors/me
+// @access  Private/Vendor
+exports.getMyVendor = asyncHandler(async (req, res) => {
+  const vendor = await Vendor.findOne({ user: req.user.id })
+    .populate('user', 'firstName lastName email phone profilePicture');
+
+  if (!vendor) {
+    res.status(404);
+    throw new Error('Vendor profile not found');
+  }
+
+  res.status(200).json({ success: true, data: vendor });
 });
 
 // @desc    Vendor Register - Page 3 (send OTP again if needed)
@@ -273,7 +449,50 @@ exports.vendorVerifyOtp = asyncHandler(async (req, res) => {
 // @route   GET /api/v1/vendors
 // @access  Public
 exports.getVendors = asyncHandler(async (req, res) => {
-  const { category, search, verified, page = 1, limit = 10 } = req.query;
+  const { category, search, verified, page = 1, limit = 10, city } = req.query;
+
+  if (city && typeof city === 'string' && city.trim()) {
+    const safeCity = city.trim();
+    const cityCoords = {
+      Lagos: { lat: 6.5244, lng: 3.3792 },
+      Abuja: { lat: 9.0765, lng: 7.3986 },
+      'Port Harcourt': { lat: 4.8156, lng: 7.0498 },
+      Ibadan: { lat: 7.3775, lng: 3.947 },
+    };
+
+    const base = cityCoords[safeCity] || cityCoords.Lagos;
+    const limitNum = Math.max(parseInt(limit, 10) || 20, 1);
+
+    const vendorList = await Vendor.find({
+      ...(category ? { serviceCategories: { $in: [sanitizeString(category)] } } : {}),
+      ...(verified === 'true' ? { isVerified: true } : {}),
+    })
+      .select('_id businessName rating totalReviews serviceCategories lat lng user profileCompletionPercentage')
+      .limit(limitNum)
+      .sort({ rating: -1 })
+      .lean();
+
+    const items = vendorList.map((v) => {
+      const lat = typeof v.lat === 'number' ? v.lat : base.lat + (Math.random() - 0.5) * 0.05;
+      const lng = typeof v.lng === 'number' ? v.lng : base.lng + (Math.random() - 0.5) * 0.05;
+      return {
+        _id: v._id,
+        name: v.businessName,
+        category: (v.serviceCategories && v.serviceCategories[0]) || category || 'Vendor',
+        rating: v.rating,
+        totalReviews: v.totalReviews,
+        lat,
+        lng,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: items,
+      items,
+      message: 'Vendors for map fetched',
+    });
+  }
 
   // Validate pagination
   const paginationVal = validatePagination(page, limit, 50);
@@ -448,40 +667,14 @@ exports.updateVendor = asyncHandler(async (req, res) => {
     throw new Error('Not authorized to update this vendor');
   }
 
-  // Validate input if provided
-  const updateData = {};
+  const updateData = getVendorProfileUpdateData(req.body);
 
-  if (req.body.businessName !== undefined) {
-    const businessNameVal = validateBusinessName(req.body.businessName);
-    if (!businessNameVal.valid) {
-      res.status(400);
-      throw new Error(businessNameVal.error);
+  if (updateData.profilePicture) {
+    const user = await User.findById(vendor.user);
+    if (user) {
+      user.profilePicture = updateData.profilePicture;
+      await user.save();
     }
-    updateData.businessName = businessNameVal.value;
-  }
-
-  if (req.body.businessDescription !== undefined && req.body.businessDescription !== null) {
-    updateData.businessDescription = sanitizeString(req.body.businessDescription).substring(0, 2000);
-  }
-
-  if (req.body.serviceCategories !== undefined && Array.isArray(req.body.serviceCategories)) {
-    updateData.serviceCategories = req.body.serviceCategories.map(cat => 
-      sanitizeString(cat).substring(0, 100)
-    ).filter(cat => cat.length > 0);
-  }
-
-  if (req.body.coverageAreas !== undefined && Array.isArray(req.body.coverageAreas)) {
-    updateData.coverageAreas = req.body.coverageAreas.map(area =>
-      sanitizeString(area).substring(0, 100)
-    ).filter(area => area.length > 0);
-  }
-
-  if (req.body.businessRegistrationNumber !== undefined) {
-    updateData.businessRegistrationNumber = sanitizeString(req.body.businessRegistrationNumber).substring(0, 50);
-  }
-
-  if (req.body.taxId !== undefined) {
-    updateData.taxId = sanitizeString(req.body.taxId).substring(0, 50);
   }
 
   vendor = await Vendor.findByIdAndUpdate(req.params.id, updateData, {
