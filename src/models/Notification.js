@@ -17,6 +17,7 @@ const notificationSchema = new mongoose.Schema(
         'REPORT_UPDATE',
         'ACCOUNT_WARNING',
         'ACCOUNT_SUSPENSION',
+        'ACCOUNT_STATUS_CHANGED',
       ],
       required: true,
     },

@@ -373,6 +373,7 @@ exports.toggleUserStatus = asyncHandler(async (req, res) => {
   }
 
   user.isActive = !user.isActive;
+  user.suspendedUntil = undefined;
   await user.save();
 
   if (!user.isActive) {
@@ -813,7 +814,10 @@ exports.bulkToggleUserStatus = asyncHandler(async (req, res) => {
 
   const safeIds = userIds.slice(0, MAX_BULK_IDS).filter((id) => /^[a-f0-9]{24}$/i.test(id));
 
-  const result = await User.updateMany({ _id: { $in: safeIds } }, { $set: { isActive } });
+  const result = await User.updateMany(
+    { _id: { $in: safeIds } },
+    { $set: { isActive }, $unset: { suspendedUntil: '' } }
+  );
 
   if (!isActive) {
     const affectedUsers = await User.find({ _id: { $in: safeIds } }).select('_id');

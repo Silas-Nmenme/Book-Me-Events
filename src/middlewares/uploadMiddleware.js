@@ -10,21 +10,14 @@ const memoryStorage = multer.memoryStorage();
 function verifyFileSignature(buffer, mimetype) {
   if (!buffer || buffer.length < 4) return false;
 
-  // Magic bytes for common image formats
-  const signatures = {
-    'image/jpeg': [0xFF, 0xD8, 0xFF],
-    'image/png': [0x89, 0x50, 0x4E, 0x47],
-    'image/gif': [0x47, 0x49, 0x46],
-    'image/webp': [0x52, 0x49, 0x46, 0x46], // RIFF for WebP
-  };
-
-  const sig = signatures[mimetype];
-  if (!sig) return false;
-
-  for (let i = 0; i < sig.length; i++) {
-    if (buffer[i] !== sig[i]) return false;
+  if (mimetype === 'application/pdf') {
+    return buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-';
   }
-  return true;
+  if (mimetype === 'image/jpeg') return buffer.length >= 3 && buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+  if (mimetype === 'image/png') return buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]));
+  if (mimetype === 'image/gif') return buffer.length >= 6 && ['GIF87a', 'GIF89a'].includes(buffer.subarray(0, 6).toString('ascii'));
+  if (mimetype === 'image/webp') return buffer.length >= 12 && buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
+  return false;
 }
 
 const fileFilter = (req, file, cb) => {
@@ -54,6 +47,18 @@ const upload = multer({
   fileFilter,
 });
 
+const evidenceMimes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'];
+const evidenceUpload = multer({
+  storage: memoryStorage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 4 },
+  fileFilter: (req, file, cb) => {
+    if (!evidenceMimes.includes(file.mimetype)) {
+      return cb(new Error('Evidence must be PNG, JPEG, WebP, GIF, or PDF (max 5 MB each).'));
+    }
+    cb(null, true);
+  },
+});
+
 function validateUploadedFiles(req, res, next) {
   const files = req.file ? [req.file] : Array.isArray(req.files) ? req.files : [];
   const invalidFile = files.find((file) => !verifyFileSignature(file.buffer, file.mimetype));
@@ -76,9 +81,20 @@ const uploadSingle = (fieldName) => (req, res, next) => {
   });
 };
 
+const uploadEvidence = (fieldName) => (req, res, next) => {
+  evidenceUpload.array(fieldName, 4)(req, res, (err) => {
+    if (err) {
+      res.status(400);
+      return next(err);
+    }
+    return validateUploadedFiles(req, res, next);
+  });
+};
+
 module.exports = {
   upload,
   uploadSingle,
+  uploadEvidence,
   validateUploadedFiles,
 };
 

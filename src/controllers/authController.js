@@ -206,9 +206,17 @@ exports.login = asyncHandler(async (req, res) => {
     throw new Error('Account not verified. Please verify your email first.');
   }
 
+  if (!user.isActive && user.suspendedUntil && user.suspendedUntil <= new Date()) {
+    user.isActive = true;
+    user.suspendedUntil = undefined;
+    await user.save();
+  }
+
   if (!user.isActive) {
     res.status(403);
-    throw new Error('Account has been deactivated');
+    throw new Error(user.suspendedUntil
+      ? `Account temporarily suspended until ${user.suspendedUntil.toISOString()}`
+      : 'Account has been suspended');
   }
 
   const isMatch = await user.matchPassword(password);

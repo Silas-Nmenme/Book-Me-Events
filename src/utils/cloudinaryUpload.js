@@ -8,7 +8,7 @@ const { cloudinary } = require('../config/cloudinary');
  * @param {string} [options.publicId]
  * @param {number} [options.quality]
  */
-async function uploadToCloudinary({ file, folder, publicId, quality = 80 }) {
+async function uploadToCloudinary({ file, folder, publicId, quality = 80, resourceType = 'image', deliveryType }) {
   if (!file) throw new Error('No file provided');
   if (!file.buffer) throw new Error('File buffer missing');
 
@@ -17,8 +17,9 @@ async function uploadToCloudinary({ file, folder, publicId, quality = 80 }) {
       {
         folder,
         public_id: publicId,
-        resource_type: 'image',
-        quality,
+        resource_type: resourceType,
+        ...(deliveryType ? { type: deliveryType } : {}),
+        ...(resourceType === 'image' ? { quality } : {}),
         overwrite: false,
       },
       (error, result) => {

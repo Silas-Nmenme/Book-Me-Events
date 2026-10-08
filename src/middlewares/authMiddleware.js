@@ -48,6 +48,30 @@ const protect = async (req, res, next) => {
         });
       }
 
+      const now = new Date();
+      if (user.suspendedUntil && user.suspendedUntil <= now && !user.isActive) {
+        user.isActive = true;
+        user.suspendedUntil = undefined;
+        await user.save();
+      }
+
+      const supportOrReportPath = ['/api/v1/tickets', '/api/v1/reports']
+        .some((path) => req.originalUrl.split('?')[0].startsWith(path));
+      if (!user.isActive && !supportOrReportPath) {
+        return res.status(403).json({
+          success: false,
+          message: user.suspendedUntil
+            ? `Account temporarily suspended until ${user.suspendedUntil.toISOString()}`
+            : 'Account has been suspended',
+        });
+      }
+      if (user.accountRestricted && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && !supportOrReportPath) {
+        return res.status(403).json({
+          success: false,
+          message: 'Account actions are restricted. Contact support for assistance.',
+        });
+      }
+
       req.user = user;
       return next();
     }

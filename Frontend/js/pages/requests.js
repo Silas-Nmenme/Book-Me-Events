@@ -588,13 +588,18 @@ export async function initRequestsPage({ me, role } = {}) {
               return;
             }
 
-            if (action === 'reportUser' || action === 'reportVendor') {
-              const reason = window.prompt('Briefly describe the issue (at least 10 characters):');
+            if (action === 'reportVendor') {
+              window.location.href = `report-vendor.html?requestId=${encodeURIComponent(id)}`;
+              return;
+            }
+
+            if (action === 'reportUser') {
+              const reason = window.prompt('Briefly describe the issue (at least 20 characters):');
               if (!reason) return;
               try {
                 await apiFetch('/api/v1/reports', {
                   method: 'POST',
-                  body: { requestId: id, reason, target: action === 'reportVendor' ? 'VENDOR' : 'USER' },
+                  body: { requestId: id, reason, target: 'USER' },
                 });
                 toast({ title: 'Report submitted', message: 'Support will review your report.', variant: 'success' });
               } catch (e) {

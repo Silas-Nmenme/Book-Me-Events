@@ -11,6 +11,8 @@ const userSchema = new mongoose.Schema(
     role: { type: String, enum: ['USER', 'VENDOR', 'ADMIN'], default: 'USER' },
     isVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
+    suspendedUntil: { type: Date },
+    accountRestricted: { type: Boolean, default: false },
     profilePicture: { type: String },
     bio: { type: String },
     favoriteVendors: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' }],
