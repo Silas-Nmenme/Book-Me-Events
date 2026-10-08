@@ -6,11 +6,12 @@ const Request = require('../models/Request');
 const User = require('../models/User');
 const UserReport = require('../models/UserReport');
 const Vendor = require('../models/Vendor');
+const Message = require('../models/Message');
 const { sendEmail } = require('../utils/emailClient');
-const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 const { cloudinary } = require('../config/cloudinary');
 const { createNotification } = require('../utils/notificationService');
 const { logActivity } = require('../utils/activityLog');
+const { uploadEvidenceFiles, deleteEvidenceAssets } = require('../utils/evidenceUploader');
 
 const REASONS = new Set([
   'FRAUD_SCAM', 'POOR_SERVICE', 'MISREPRESENTATION', 'HARASSMENT', 'NO_SHOW',
@@ -80,9 +81,79 @@ exports.getReportVendors = asyncHandler(async (req, res) => {
   });
 });
 
+exports.getReportUsers = asyncHandler(async (req, res) => {
+  const vendor = await Vendor.findOne({ user: req.user.id }).select('_id');
+  if (!vendor) return res.status(403).json({ success: false, message: 'Vendor profile not found' });
+  const [requests, bookings] = await Promise.all([
+      Request.find({ vendor: vendor._id })
+        .select('user eventDate eventDescription status')
+        .populate('user', 'firstName lastName email role isActive')
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean(),
+      Booking.find({ vendor: vendor._id })
+        .select('user eventDate bookingStatus')
+        .populate('user', 'firstName lastName email role isActive')
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean(),
+  ]);
+  const conversations = await Message.find({
+    $or: [
+      { sender: req.user.id },
+      { recipient: req.user.id },
+    ],
+  })
+    .select('sender recipient request booking')
+    .sort({ createdAt: -1 })
+    .limit(500)
+    .lean();
+
+  const relatedUserIds = new Set([
+    ...requests.map((item) => item.user?._id).filter(Boolean).map(String),
+    ...bookings.map((item) => item.user?._id).filter(Boolean).map(String),
+    ...conversations.flatMap((item) => [item.sender, item.recipient])
+      .filter((id) => String(id) !== String(req.user.id))
+      .map(String),
+  ]);
+  const users = await User.find({ _id: { $in: [...relatedUserIds] }, role: 'USER', isActive: true })
+    .select('firstName lastName email')
+    .sort({ firstName: 1, lastName: 1 })
+    .lean();
+  const preferredIds = new Set([
+    ...requests.map((item) => item.user?._id).filter(Boolean).map(String),
+    ...bookings.map((item) => item.user?._id).filter(Boolean).map(String),
+    ...conversations.flatMap((item) => [item.sender, item.recipient])
+      .filter((id) => String(id) !== String(req.user.id))
+      .map(String),
+  ]);
+  res.status(200).json({
+    success: true,
+    data: {
+      users: users.map((user) => ({
+        _id: user._id,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        email: user.email,
+        preferred: preferredIds.has(String(user._id)),
+      })),
+      requests: requests.filter((item) => item.user?.role === 'USER' && item.user.isActive).map((item) => ({
+        _id: item._id,
+        userId: item.user._id,
+        label: `${item.user.firstName} ${item.user.lastName} · ${new Date(item.eventDate).toLocaleDateString()} · Request`,
+      })),
+      bookings: bookings.filter((item) => item.user?.role === 'USER' && item.user.isActive).map((item) => ({
+        _id: item._id,
+        userId: item.user._id,
+        label: `${item.user.firstName} ${item.user.lastName} · ${new Date(item.eventDate).toLocaleDateString()} · Booking`,
+      })),
+    },
+  });
+});
+
 exports.createUserReport = asyncHandler(async (req, res) => {
   const {
     vendorId,
+    reportedUserId: submittedUserId,
     requestId,
     bookingId,
     target,
@@ -119,6 +190,7 @@ exports.createUserReport = asyncHandler(async (req, res) => {
   let vendor;
   let request = null;
   let booking = null;
+  let reportedUserId = null;
   if (reportedRole === 'VENDOR') {
     if (!mongoose.Types.ObjectId.isValid(vendorId || '')) {
       return res.status(400).json({ success: false, message: 'Select a valid vendor' });
@@ -147,26 +219,62 @@ exports.createUserReport = asyncHandler(async (req, res) => {
     }
     const vendorProfile = await Vendor.findOne({ user: req.user.id }).select('_id');
     if (!vendorProfile) return res.status(403).json({ success: false, message: 'Vendor profile not found' });
-    request = await Request.findOne({ _id: requestId, vendor: vendorProfile?._id }).select('user vendor booking');
-    if (!request) return res.status(404).json({ success: false, message: 'Request not found for this vendor' });
-    vendor = await Vendor.findById(request.vendor).populate('user', 'firstName lastName email role isActive');
+    vendor = await Vendor.findById(vendorProfile._id).populate('user', 'firstName lastName email role isActive');
     if (!vendor?.user) return res.status(404).json({ success: false, message: 'Vendor profile not found' });
+    if (submittedUserId && !mongoose.Types.ObjectId.isValid(submittedUserId)) {
+      return res.status(400).json({ success: false, message: 'Select a valid user' });
+    }
+    if (requestId) {
+      request = await Request.findOne({
+        _id: requestId,
+        vendor: vendor._id,
+        ...(submittedUserId ? { user: submittedUserId } : {}),
+      }).select('user vendor booking');
+      if (!request) return res.status(400).json({ success: false, message: 'Request is not related to this user and vendor' });
+    }
     if (bookingId) {
-      booking = await Booking.findOne({ _id: bookingId, vendor: vendor._id, request: request._id });
-      if (!booking) return res.status(400).json({ success: false, message: 'The selected booking is not related to this request' });
+      booking = await Booking.findOne({
+        _id: bookingId,
+        vendor: vendor._id,
+        ...(submittedUserId ? { user: submittedUserId } : {}),
+        ...(request ? { request: request._id } : {}),
+      }).select('user vendor request');
+      if (!booking) return res.status(400).json({ success: false, message: 'Booking is not related to this user and vendor' });
+    }
+    reportedUserId = submittedUserId || request?.user || booking?.user;
+    if (!reportedUserId) return res.status(400).json({ success: false, message: 'Select a user with a marketplace relationship' });
+    if (request && booking && String(request._id) !== String(booking.request)) {
+      return res.status(400).json({ success: false, message: 'Request and booking are not related' });
+    }
+
+    const [hasRequest, hasBooking] = await Promise.all([
+      Request.exists({ vendor: vendor._id, user: reportedUserId }),
+      Booking.exists({ vendor: vendor._id, user: reportedUserId }),
+    ]);
+    let hasRelatedMessage = false;
+    if (!hasRequest && !hasBooking) {
+      hasRelatedMessage = !!(await Message.exists({
+        $or: [
+          { sender: reportedUserId, recipient: req.user.id },
+          { sender: req.user.id, recipient: reportedUserId },
+        ],
+      }));
+    }
+    if (!hasRequest && !hasBooking && !hasRelatedMessage) {
+      return res.status(403).json({ success: false, message: 'You can only report users connected to your requests, bookings, or related conversations' });
     }
   }
 
   const reporter = req.user;
   const reportedAccount = reportedRole === 'VENDOR'
     ? vendor.user
-    : await User.findById(request.user).select('_id firstName lastName email role');
-  if (!reportedAccount) return res.status(404).json({ success: false, message: 'Reported account not found' });
+    : await User.findOne({ _id: reportedUserId, role: 'USER', isActive: true }).select('_id firstName lastName email role');
+  if (!reportedAccount) return res.status(404).json({ success: false, message: 'Reported account not found or unavailable' });
 
   const files = Array.isArray(req.files) ? req.files : [];
   const report = new UserReport({
     reporter: req.user.id,
-    reportedUser: reportedRole === 'VENDOR' ? vendor.user._id : request.user,
+    reportedUser: reportedRole === 'VENDOR' ? vendor.user._id : reportedAccount._id,
     reportedRole,
     vendor: vendor._id,
     request: request?._id,
@@ -176,30 +284,13 @@ exports.createUserReport = asyncHandler(async (req, res) => {
     description,
     priority: 'MEDIUM',
   });
-  const uploadedAssets = [];
+  let uploadedAssets = [];
   try {
-    for (const file of files) {
-      const resourceType = file.mimetype === 'application/pdf' ? 'raw' : 'image';
-      const uploaded = await uploadToCloudinary({
-        file,
-        folder: `user_reports/${report.reportId}`,
-        resourceType,
-        deliveryType: 'authenticated',
-        publicId: resourceType === 'raw' ? `${report.reportId}-${uploadedAssets.length + 1}.pdf` : undefined,
-      });
-      uploadedAssets.push({
-        url: uploaded.secure_url,
-        publicId: uploaded.public_id,
-        resourceType,
-        mimeType: file.mimetype,
-        originalName: file.originalname.replace(/[\r\n]/g, '').slice(0, 255),
-        size: file.size,
-      });
-    }
+    uploadedAssets = await uploadEvidenceFiles(files, `user_reports/${report.reportId}`);
     report.evidence = uploadedAssets;
     await report.save();
   } catch (error) {
-    await Promise.all(uploadedAssets.map((asset) => cloudinary.uploader.destroy(asset.publicId, { resource_type: asset.resourceType }).catch(() => null)));
+    await deleteEvidenceAssets(uploadedAssets);
     throw error;
   }
 

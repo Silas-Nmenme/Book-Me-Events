@@ -55,7 +55,7 @@ const protect = async (req, res, next) => {
         await user.save();
       }
 
-      const supportOrReportPath = ['/api/v1/tickets', '/api/v1/reports']
+      const supportOrReportPath = ['/api/v1/tickets', '/api/v1/reports', '/api/v1/vendors/tickets']
         .some((path) => req.originalUrl.split('?')[0].startsWith(path));
       if (!user.isActive && !supportOrReportPath) {
         return res.status(403).json({
